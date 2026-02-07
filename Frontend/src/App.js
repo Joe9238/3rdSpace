@@ -8,7 +8,8 @@ import RequireAuth from './utils/RequireAuth';
 import { authRequest } from './utils/AuthRequest';
 import Register from './Pages/Register';
 import { useNavigate } from 'react-router-dom';
-import Map from './Components/Map';
+import MapPage from './Pages/MapPage';
+import Home from './Pages/Home';
 
 function AppWrapper() {
   return (
@@ -53,6 +54,7 @@ function App() {
     <div className="App">
       <nav className="App-nav">
         <Link to="/"><img src={logo} id="logo" className="App-logo" alt="logo" /></Link>
+        <Link to="/map" className="nav-button" style={{ paddingLeft: "20px", paddingRight: "20px" }}>Map</Link>
         {isAuthenticated ? (
           <Link to="/profile" className="nav-button">Profile</Link>
         ) : (
@@ -62,11 +64,11 @@ function App() {
           </div>
         )}
       </nav>
-      <Map />
       <Routes>
+        <Route path="/" element={<Home />} />
         <Route path="/login" element={<Login onLogin={handleLogin} />} />
         <Route path="/register" element={<Register onLogin={handleLogin} />} />
-
+        <Route path="/map" element={<MapPage />} />
         <Route
           path="/profile"
           element={
