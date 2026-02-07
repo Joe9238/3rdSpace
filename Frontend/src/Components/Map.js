@@ -23,6 +23,8 @@ const Map = ({ publicSpaces = [] }) => {
 	const [heatData, setHeatData] = useState([]);
 	const [zoomLevel, setZoomLevel] = useState(6);
 	const fetchTimeout = useRef(null);
+	// Local cache for heat data, keyed by rounded bounds
+	const heatCache = useRef({});
 		// Fixed heatmap options
 		const radius = 55;
 		const blur = 70;
@@ -48,9 +50,22 @@ const Map = ({ publicSpaces = [] }) => {
 	//     };
 	// })();
 
-	// Helper to fetch heat data for given bounds
+	// Helper to round bounds for cache key
+	const round = (num, places = 3) => Math.round(num * Math.pow(10, places)) / Math.pow(10, places);
+	const boundsKey = (bounds) => {
+		const sw = bounds.getSouthWest();
+		const ne = bounds.getNorthEast();
+		return [round(sw.lat), round(sw.lng), round(ne.lat), round(ne.lng)].join(",");
+	};
+
+	// Helper to fetch heat data for given bounds, with cache
 	const fetchHeatData = async (bounds) => {
 		if (!bounds) return;
+		const key = boundsKey(bounds);
+		if (heatCache.current[key]) {
+			setHeatData(heatCache.current[key]);
+			return;
+		}
 		const sw = bounds.getSouthWest();
 		const nw = L.latLng(bounds.getNorth(), bounds.getWest());
 		const ne = bounds.getNorthEast();
@@ -72,6 +87,7 @@ const Map = ({ publicSpaces = [] }) => {
 			});
 			const data = await res.json();
 			if (data && Array.isArray(data.heat)) {
+				heatCache.current[key] = data.heat;
 				setHeatData(data.heat);
 			} else {
 				setHeatData([]);
