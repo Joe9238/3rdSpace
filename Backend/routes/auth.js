@@ -49,4 +49,8 @@ module.exports = function(app, io) {
     app.delete("/api/auth/delete", AuthMiddleware, async (req, res) => {
         authController.deleteUser(req, res);
     });
+
+    app.get("/api/auth/me", AuthMiddleware, async (req, res) => {
+        authController.getMe(req, res);
+    });
 };
