@@ -4,13 +4,12 @@ import Security from '../Components/Security.js';
 import PersonalInfo from '../Components/PersonalInfo.js';
 
 const navItems = [
-  { key: 'booking', label: 'Booking' },
   { key: 'personal', label: 'Personal Info' },
   { key: 'security', label: 'Security' },
 ];
 
 export default function Profile({ onLogout }) {
-  const [selected, setSelected] = useState('booking');
+  const [selected, setSelected] = useState('personal');
 
   const handleLogout = async () => {
     try {

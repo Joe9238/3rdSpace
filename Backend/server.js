@@ -14,7 +14,7 @@ const dbConfig = {
   host: process.env.MYSQL_HOST || "mysql",
   user: process.env.MYSQL_USER || "uop_user",
   password: process.env.MYSQL_PASSWORD || "uop_pass",
-  database: process.env.MYSQL_DATABASE || "uop_db",
+  database: process.env.MYSQL_DATABASE || "3rdSpace",
   port: process.env.MYSQL_PORT || 3306
 };
 
