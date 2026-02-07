@@ -85,7 +85,6 @@ function App() {
           path="/map"
           element={
             <RequireAuth onAuthChange={setIsAuthenticated}>
-            <Map/>
             </RequireAuth>
           }
         />
