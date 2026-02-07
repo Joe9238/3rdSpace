@@ -1,4 +1,4 @@
-import logo from './logo.png';
+import logo from './images/logo.png';
 import './App.css';
 import { useEffect, useState } from 'react';
 import Login from './Pages/Login';
@@ -8,8 +8,8 @@ import RequireAuth from './utils/RequireAuth';
 import { authRequest } from './utils/AuthRequest';
 import Register from './Pages/Register';
 import { useNavigate } from 'react-router-dom';
+import Map from './Components/Map';
 import Map from './Pages/Map';
-
 function AppWrapper() {
   return (
     <BrowserRouter>
@@ -68,6 +68,7 @@ function App() {
       </nav>
       
       <Routes>
+        <Route path="/" element={<Map />} />
         <Route path="/login" element={<Login onLogin={handleLogin} />} />
         <Route path="/register" element={<Register onLogin={handleLogin} />} />
 

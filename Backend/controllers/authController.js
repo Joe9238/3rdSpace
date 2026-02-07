@@ -317,6 +317,30 @@ module.exports = function(io) {
             res.status(500).json({ error: "Server error" });
         }
     }
+
+    async function getMe(req, res) {
+        try {
+            const token = req.cookies && req.cookies.token;
+            if (!token) {
+                return res.status(401).json({ error: "Not authenticated" });
+            }
+            let jwtPayload;
+            try {
+                jwtPayload = jwt.verify(token, JWT_SECRET);
+            } catch (e) {
+                return res.status(401).json({ error: "Invalid token" });
+            }
+            const db = req.app.locals.db;
+            const user = await User.findById(db, jwtPayload.userId);
+            if (!user) {
+                return res.status(404).json({ error: "User not found" });
+            }
+            res.json({ username: user.username });
+        } catch (err) {
+            res.status(500).json({ error: "Server error" });
+        }
+    }
+
     return {
         logout,
         logoutEverywhere,
@@ -325,6 +349,7 @@ module.exports = function(io) {
         register,
         deleteUser,
         changePassword,
-        changeUsername
+        changeUsername,
+        getMe
     };
 };
