@@ -8,7 +8,7 @@ import RequireAuth from './utils/RequireAuth';
 import { authRequest } from './utils/AuthRequest';
 import Register from './Pages/Register';
 import { useNavigate } from 'react-router-dom';
-import Map from './Components/Map';
+//import Map from './Components/Map';
 import Map from './Pages/Map';
 function AppWrapper() {
   return (
@@ -56,7 +56,7 @@ function App() {
         {isAuthenticated ? (
          <div>
           <Link to="/profile" className="nav-button">Profile</Link>
-           <Link to="/map" className="nav-button">Map</Link>
+           <Link to="/Map" className="nav-button">Map</Link>
           </div>
        
         ) : (
