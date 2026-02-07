@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { authRequest } from '../utils/AuthRequest';
 import Security from '../Components/Security.js';
 import Info from '../Components/Info.js';
-import SavedLocationMap from '../Components/SavedLocationMap.js';
+import SavedLocationMap from '../Components/Map.js';
 
 const navItems = [
   { key: 'personal', label: 'Personal Info' },

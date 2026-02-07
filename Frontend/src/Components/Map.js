@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
-
+import Panel from "../Components/panel";
 // Replace with your PNG path
 import heatOnPng from '../images/heat-on.png';
 import heatOffPng from '../images/heat-off.png';
@@ -16,6 +16,8 @@ import 'leaflet.heat';
 
 
 const Map = ({ publicSpaces = [] }) => {
+	
+    const [isOpen, setIsOpen] = useState(false);
 	const mapRef = useRef(null);
 	const leafletMap = useRef(null);
 	const heatLayerRef = useRef(null);
@@ -30,22 +32,51 @@ const Map = ({ publicSpaces = [] }) => {
 			// Fetch amenities from Overpass API
 			const fetchAmenities = async (lat, lng, radius = 400) => {
 				const amenityTypes = [
-					"pub", "bar", "restaurant", "cafe", "fast_food", "nightclub",
-					"cinema", "theatre", "arts_centre", "museum", "library",
-					"supermarket", "bakery"
+						"pub", "bar", "restaurant", "cafe", "fast_food", "biergarten", "ice_cream",
+
+						"cinema", "theatre", "arts_centre", "museum", "library", "karaoke_box",
+						"nightclub", "escape_game", "bowling_alley",
+						"community_centre", "social_centre", "youth_centre",
+						"townhall", "public_bookcase", "cultural_centre", "community_hall",
+
+						"bakery",
+
+						"park", "garden", "recreation_ground", "playground", "common",
+						"dog_park", "pitch", "golf_course", "outdoor_seating",
+
+						"beach", "nature_reserve"
+
 				];
+				const tags = ["amenity", "leisure", "natural", "landuse"];
 				const query = `
 					[out:json];
 					(
-						${amenityTypes.map(type => `
-							node["amenity"="${type}"](around:${radius},${lat},${lng});
-							way["amenity"="${type}"](around:${radius},${lat},${lng});
-							relation["amenity"="${type}"](around:${radius},${lat},${lng});
-						`).join('')}
-						node["shop"](around:${radius},${lat},${lng});
-						way["shop"](around:${radius},${lat},${lng});
-						relation["shop"](around:${radius},${lat},${lng});
+				${tags.map( tag =>
+				       amenityTypes.map(type => `
+							node["${tag}"="${type}"](around:${radius},${lat},${lng});
+							way["${tag}"="${type}"](around:${radius},${lat},${lng});
+							relation["${tag}"="${type}"](around:${radius},${lat},${lng});
+							`)
+							.join("")
+					)
+						.join("")}
+					node["leisure"="nature_reserve"](around:${radius},${lat},${lng});
+					way["leisure"="nature_reserve"](around:${radius},${lat},${lng});
+					relation["leisure"="nature_reserve"](around:${radius},${lat},${lng});
+
+					node["natural"](around:${radius},${lat},${lng});
+					way["natural"](around:${radius},${lat},${lng});
+					relation["natural"](around:${radius},${lat},${lng});
 					);
+
+					node["boundary"="protected_area"]["protect_class"="2"](around:${radius},${lat},${lng});
+					way["boundary"="protected_area"]["protect_class"="2"](around:${radius},${lat},${lng});
+					relation["boundary"="protected_area"]["protect_class"="2"](around:${radius},${lat},${lng});
+
+					node["boundary"="national_park"](around:${radius},${lat},${lng});
+					way["boundary"="national_park"](around:${radius},${lat},${lng});
+					relation["boundary"="national_park"](around:${radius},${lat},${lng});
+
 					out center;
 				`;
 				const url = 'https://overpass-api.de/api/interpreter';
@@ -56,6 +87,8 @@ const Map = ({ publicSpaces = [] }) => {
 				});
 				const data = await res.json();
 				// Filter results to only visitable places
+  
+            
 				return data.elements.filter(a => {
 					const amenity = a.tags && a.tags.amenity;
 					const shop = a.tags && a.tags.shop;
@@ -63,6 +96,7 @@ const Map = ({ publicSpaces = [] }) => {
 						(amenity && amenityTypes.includes(amenity)) || shop
 					);
 				});
+			
 			};
 		// Fixed heatmap options
 		const radius = 55;
@@ -177,7 +211,10 @@ const Map = ({ publicSpaces = [] }) => {
 			const { lat, lng } = e.latlng;
 			setAmenityPopup({ lat, lng, amenities: null }); // Show loading
 			const amenities = await fetchAmenities(lat, lng);
+            setIsOpen(true); 
+
 			setAmenityPopup({ lat, lng, amenities });
+
 		});
 
 		// Set initial zoom
@@ -236,10 +273,15 @@ const Map = ({ publicSpaces = [] }) => {
 			}
 		}, [heatData, showHeat, zoomLevel]);
 	return (
+				
+
+
+
 		<div style={{ display: 'flex', flexDirection: 'row', alignItems: 'flex-start' }}>
 			<div ref={mapRef} style={{ height: 750, width: 750 }} />
 			<div style={{ marginLeft: 24, display: 'flex', flexDirection: 'column', alignItems: 'flex-start', height: 750, width: 350, background: '#fafafa', borderRadius: 8, boxShadow: '0 2px 8px rgba(0,0,0,0.07)', padding: 16 }}>
 				<div style={{ display: 'flex', alignItems: 'center', marginBottom: 16 }}>
+	
 					<button
 						onClick={() => setShowHeat(h => !h)}
 						style={{
@@ -260,7 +302,12 @@ const Map = ({ publicSpaces = [] }) => {
 					</button>
 					<span style={{ fontSize: 18, userSelect: 'none' }}>Show Heatmap</span>
 				</div>
+
+		{/*
+				
 				<div style={{ marginTop: 8, width: '100%' }}>
+							
+
 					<div style={{ fontWeight: 600, fontSize: 17, marginBottom: 8 }}>Amenities Nearby</div>
 					{amenityPopup && amenityPopup.amenities === null && (
 						<div style={{ color: '#888', fontStyle: 'italic' }}>Loading amenities...</div>
@@ -278,6 +325,8 @@ const Map = ({ publicSpaces = [] }) => {
 								const latVal = a.lat || (a.center && a.center.lat);
 								const lngVal = a.lon || (a.center && a.center.lon);
 								return (
+
+									
 									<li key={idx} style={{ marginBottom: 8 }}>
 										<b>{name}</b> <span style={{ color: '#888' }}>({type})</span>
 										{desc && <div style={{ fontSize: 13, color: '#555', marginTop: 2 }}>{desc}</div>}
@@ -292,8 +341,20 @@ const Map = ({ publicSpaces = [] }) => {
 					{amenityPopup && amenityPopup.amenities && amenityPopup.amenities.length > 10 && (
 						<div style={{ marginTop: 8, color: '#888' }}>+{amenityPopup.amenities.length - 10} more...</div>
 					)}
-				</div>
-			</div>
+*/} 
+					
+			
+					</div>
+						
+
+				{amenityPopup && (
+					<Panel
+					    key={`${amenityPopup?.lat}-${amenityPopup?.lng}`}
+						isOpen={isOpen}
+						closePanel={() => setIsOpen(false)}
+						amenities={amenityPopup.amenities}
+					/>
+                    )}
 		</div>
 	);
 };
