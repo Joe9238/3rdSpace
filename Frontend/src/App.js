@@ -62,8 +62,9 @@ function App() {
           </div>
         )}
       </nav>
-      <Map />
+      
       <Routes>
+        <Route path="/" element={<Map />} />
         <Route path="/login" element={<Login onLogin={handleLogin} />} />
         <Route path="/register" element={<Register onLogin={handleLogin} />} />
 

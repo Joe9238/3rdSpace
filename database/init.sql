@@ -16,6 +16,17 @@ CREATE TABLE IF NOT EXISTS tokens (
     FOREIGN KEY (userId) REFERENCES users(id) ON DELETE CASCADE
 );
 
+-- MySQL schema for savedLocations table
+CREATE TABLE IF NOT EXISTS savedLocations (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    userId INT NOT NULL,
+    name VARCHAR(255) NOT NULL,
+    latitude DOUBLE NOT NULL,
+    longitude DOUBLE NOT NULL,
+    createdAt DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (userId) REFERENCES users(id) ON DELETE CASCADE
+);
+
 -- Insert initial admin user (password: adminpassword)
 INSERT INTO users (username, passwordHash, role) VALUES ('admin', '$2b$10$w0ha/JcTQVIRpdaFDTjV..LFdqq1I92O9mkaJ5pslCBlQoZ15MaZK', 'admin')
     ON DUPLICATE KEY UPDATE username=username;

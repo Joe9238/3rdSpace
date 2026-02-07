@@ -99,21 +99,47 @@ const SavedLocationMap = () => {
 		leafletMap.current._markers = [...placeMarkers, ...eventMarkers];
 	}, [locations, events]);
 
+	// Fetch saved locations on mount
+	useEffect(() => {
+		async function fetchLocations() {
+			try {
+				const res = await fetch('/api/location/saved', {
+					credentials: 'include',
+				});
+				if (res.ok) {
+					const data = await res.json();
+					setLocations(data.locations.map(loc => ({
+						id: loc.id,
+						name: loc.name,
+						lat: loc.latitude,
+						lng: loc.longitude,
+					})));
+				}
+			} catch (err) {
+				console.error('Failed to fetch saved locations:', err);
+			}
+		}
+		fetchLocations();
+	}, []);
+
 	// Handle popup form submission
 	const handlePopupSubmit = async (e) => {
 		e.preventDefault();
 		if (!popup || !placeName.trim()) return;
 		const newLoc = { lat: popup.lat, lng: popup.lng, name: placeName.trim() };
-		setLocations(prev => [...prev, newLoc]);
 		setPopup(null);
 		setPlaceName('');
-		// Optionally: save to backend
 		try {
-			await fetch('/api/save-location', {
+			const res = await fetch('/api/location/save', {
 				method: 'POST',
 				headers: { 'Content-Type': 'application/json' },
+				credentials: 'include',
 				body: JSON.stringify(newLoc)
 			});
+			if (res.ok) {
+				const saved = await res.json();
+				setLocations(prev => [...prev, { id: saved.id, name: saved.name, lat: saved.lat, lng: saved.lng }]);
+			}
 		} catch (err) {
 			console.error('Failed to save location:', err);
 		}
