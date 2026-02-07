@@ -36,7 +36,7 @@ let port = 9000;
 
 // Allow credentials in CORS for both Docker and host browser
 app.use((req, res, next) => {
-  const allowedOrigins = ["http://frontend-e2e:3000", "http://localhost:81"];
+  const allowedOrigins = ["http://localhost:81"];
   const origin = req.headers.origin;
   if (allowedOrigins.includes(origin)) {
     res.setHeader("Access-Control-Allow-Origin", origin);
@@ -57,7 +57,7 @@ const server = app.listen(port, () => {
 let socketIo = require("socket.io");
 let io = socketIo(server, {
   cors: {
-    origin: ["http://frontend-e2e:3000", "http://localhost:81"],
+    origin: ["http://localhost:81"],
     credentials: true
   }
 });
