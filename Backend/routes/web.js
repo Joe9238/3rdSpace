@@ -8,7 +8,7 @@ module.exports = function(app, io) {
         res.json({ status: "ok" });
     });
 
-    app.get("/api/crime/maparea", async (req, res) => {
+    app.post("/api/crime/maparea", async (req, res) => {
         crimeController.mapArea(req, res);
     });
 };

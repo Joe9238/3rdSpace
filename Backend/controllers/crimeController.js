@@ -23,14 +23,24 @@ module.exports = function(io) {
         const last3Months = ["2025-12", "2025-11", "2025-10"];
         // Aggregate all crimes from the last 3 months
         let allCrimes = [];
+        let rateLimited = false;
+        let rateLimitMessage = '';
         for (let month of last3Months) {
             let apiUrl = `https://data.police.uk/api/crimes-street/all-crime?date=${month}&poly=${requestedPoly}`;
             try {
                 const response = await axios.get(apiUrl);
                 allCrimes = allCrimes.concat(response.data);
             } catch (err) {
+                if (err.response && err.response.status === 429) {
+                    rateLimited = true;
+                    rateLimitMessage = err.response.data || 'Rate limit exceeded';
+                    break;
+                }
                 // Optionally, you could log or collect errors per month
             }
+        }
+        if (rateLimited) {
+            return res.status(429).json({ message: 'Police API rate limit exceeded', details: rateLimitMessage });
         }
         // Build grid and count crimes in each cell (combined)
         let grid = Array.from({ length: gridRows }, () => Array(gridCols).fill(0));
