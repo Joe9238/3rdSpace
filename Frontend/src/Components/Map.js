@@ -21,25 +21,32 @@ const Map = ({ publicSpaces = [] }) => {
 	const heatLayerRef = useRef(null);
 	const [showHeat, setShowHeat] = useState(true);
 	const [heatData, setHeatData] = useState([]);
+	const [zoomLevel, setZoomLevel] = useState(6);
 	const fetchTimeout = useRef(null);
-	// Fixed heatmap options
-	const radius = 35;
-	const blur = 20;
-	const maxIntensity = 1.2;
-
-
-	// Debounced heat data fetch
-	const debounceFetch = (() => {
-		let lastCall = 0;
-		let timer = null;
-		return (bounds, delay = 700) => {
-			if (timer) clearTimeout(timer);
-			timer = setTimeout(() => {
-				lastCall = Date.now();
-				fetchHeatData(bounds);
-			}, delay);
+		// Fixed heatmap options
+		const radius = 55;
+		const blur = 70;
+		// Dynamically adjust maxIntensity based on zoom
+		const getMaxIntensity = (zoom) => {
+			if (zoom >= 16) return 1.2;
+			if (zoom >= 15) return 1.7;
+			if (zoom >= 14) return 2.2;
+			return 0.3;
 		};
-	})();
+
+
+	// Debounced heat data fetch (commented out)
+	// const debounceFetch = (() => {
+	//     let lastCall = 0;
+	//     let timer = null;
+	//     return (bounds, delay = 700) => {
+	//         if (timer) clearTimeout(timer);
+	//         timer = setTimeout(() => {
+	//             lastCall = Date.now();
+	//             fetchHeatData(bounds);
+	//         }, delay);
+	//     };
+	// })();
 
 	// Helper to fetch heat data for given bounds
 	const fetchHeatData = async (bounds) => {
@@ -98,16 +105,24 @@ const Map = ({ publicSpaces = [] }) => {
 		}).addTo(leafletMap.current);
 
 		// Fetch initial heat data
-		debounceFetch(leafletMap.current.getBounds());
+		fetchHeatData(leafletMap.current.getBounds());
 
 		// Listen for map move/zoom events
 		const onMoveEnd = () => {
-			debounceFetch(leafletMap.current.getBounds());
+			fetchHeatData(leafletMap.current.getBounds());
+			setZoomLevel(leafletMap.current.getZoom());
 		};
 		leafletMap.current.on('moveend', onMoveEnd);
+		// Also update zoom on zoom events
+		const onZoom = () => setZoomLevel(leafletMap.current.getZoom());
+		leafletMap.current.on('zoomend', onZoom);
+
+		// Set initial zoom
+		setZoomLevel(leafletMap.current.getZoom());
 
 		return () => {
 			leafletMap.current.off('moveend', onMoveEnd);
+			leafletMap.current.off('zoomend', onZoom);
 		};
 	}, []);
 
@@ -126,33 +141,35 @@ const Map = ({ publicSpaces = [] }) => {
 		leafletMap.current._publicMarkers = markers;
 	}, [publicSpaces]);
 
-	// Add/remove heat layer
-	useEffect(() => {
-		if (!leafletMap.current) return;
-		if (!window.L || !window.L.heatLayer) return; // leaflet.heat required
-		if (heatLayerRef.current) {
-			heatLayerRef.current.remove();
-			heatLayerRef.current = null;
-		}
-		if (showHeat && heatData && heatData.length > 0) {
-			// Custom red gradient
-			const gradient = {
-				0.0: '#000000',
-				0.2: '#330000',
-				0.4: '#990000',
-				0.6: '#ff0000',
-				0.8: '#ff5555',
-				1.0: '#ffff00',
-			};
-			heatLayerRef.current = window.L.heatLayer(heatData, {
-				radius,
-				blur,
-				maxZoom: 17,
-				gradient,
-				max: maxIntensity,
-			}).addTo(leafletMap.current);
-		}
-	}, [heatData, showHeat]);
+		// Add/remove heat layer
+		useEffect(() => {
+			if (!leafletMap.current) return;
+			if (!window.L || !window.L.heatLayer) return; // leaflet.heat required
+			if (heatLayerRef.current) {
+				heatLayerRef.current.remove();
+				heatLayerRef.current = null;
+			}
+			// Only show heatmap if zoomed in (e.g., zoom >= 14)
+			if (showHeat && heatData && heatData.length > 0 && zoomLevel >= 14) {
+				// Pure red gradient
+				const gradient = {
+					0.0: '#fff5f5',
+					0.2: '#ffcccc',
+					0.4: '#ff9999',
+					0.6: '#ff5555',
+					0.8: '#ff2222',
+					1.0: '#ff0000',
+				};
+				const maxIntensity = getMaxIntensity(zoomLevel);
+				heatLayerRef.current = window.L.heatLayer(heatData, {
+					radius,
+					blur,
+					maxZoom: 17,
+					gradient,
+					max: maxIntensity,
+				}).addTo(leafletMap.current);
+			}
+		}, [heatData, showHeat, zoomLevel]);
 	return (
 		<div style={{ display: 'flex', flexDirection: 'row', alignItems: 'flex-start' }}>
 			<div ref={mapRef} style={{ height: 750, width: 750 }} />

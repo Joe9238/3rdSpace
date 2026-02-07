@@ -10,15 +10,39 @@ module.exports = function(io) {
             const [lat, lng] = p.split(",").map(Number);
             return { lat, lng };
         });
-        const minLat = Math.min(...polyCoords.map(p => p.lat));
-        const maxLat = Math.max(...polyCoords.map(p => p.lat));
-        const minLng = Math.min(...polyCoords.map(p => p.lng));
-        const maxLng = Math.max(...polyCoords.map(p => p.lng));
+        // Calculate bounds for the selected area
+        let minLat = Math.min(...polyCoords.map(p => p.lat));
+        let maxLat = Math.max(...polyCoords.map(p => p.lat));
+        let minLng = Math.min(...polyCoords.map(p => p.lng));
+        let maxLng = Math.max(...polyCoords.map(p => p.lng));
+
+        // Enforce a minimum area of 0.05 x 0.05 degrees for normalization, but keep requested area for display
+        const minAreaSize = 0.05;
+        const reqMinLat = minLat;
+        const reqMaxLat = maxLat;
+        const reqMinLng = minLng;
+        const reqMaxLng = maxLng;
+        const centerLat = (minLat + maxLat) / 2;
+        const centerLng = (minLng + maxLng) / 2;
+        let areaLat = maxLat - minLat;
+        let areaLng = maxLng - minLng;
+        if (areaLat < minAreaSize) {
+            minLat = centerLat - minAreaSize / 2;
+            maxLat = centerLat + minAreaSize / 2;
+        }
+        if (areaLng < minAreaSize) {
+            minLng = centerLng - minAreaSize / 2;
+            maxLng = centerLng + minAreaSize / 2;
+        }
 
         const gridRows = 10;
         const gridCols = 10;
-        const latStep = (maxLat - minLat) / gridRows;
-        const lngStep = (maxLng - minLng) / gridCols;
+        // For normalization, use the wider area
+        const normLatStep = (maxLat - minLat) / gridRows;
+        const normLngStep = (maxLng - minLng) / gridCols;
+        // For display, use the requested area
+        const dispLatStep = (reqMaxLat - reqMinLat) / gridRows;
+        const dispLngStep = (reqMaxLng - reqMinLng) / gridCols;
 
         const last3Months = ["2025-12", "2025-11", "2025-10"];
         // Aggregate all crimes from the last 3 months
@@ -42,53 +66,36 @@ module.exports = function(io) {
         if (rateLimited) {
             return res.status(429).json({ message: 'Police API rate limit exceeded', details: rateLimitMessage });
         }
-        // Build grid and count crimes in each cell (combined)
-        let grid = Array.from({ length: gridRows }, () => Array(gridCols).fill(0));
+        // Aggregate crimes at the same coordinate, each adding 0.1 intensity, capped at 1.0
+        const coordMap = new Map();
         for (let crime of allCrimes) {
             if (!crime.location) continue;
             const lat = parseFloat(crime.location.latitude);
             const lng = parseFloat(crime.location.longitude);
-            // Clamp to grid
-            let row = Math.floor((lat - minLat) / latStep);
-            let col = Math.floor((lng - minLng) / lngStep);
-            // Edge case: max value
-            if (row === gridRows) row = gridRows - 1;
-            if (col === gridCols) col = gridCols - 1;
-            if (row >= 0 && row < gridRows && col >= 0 && col < gridCols) {
-                grid[row][col]++;
+            if (!pointInPolygon(lat, lng, polyCoords)) continue;
+            // Use a fixed precision to group close points (e.g., 5 decimal places ~1m)
+            const key = lat.toFixed(5) + ',' + lng.toFixed(5);
+            if (!coordMap.has(key)) {
+                coordMap.set(key, { lat, lng, intensity: 0 });
             }
+            let obj = coordMap.get(key);
+            obj.intensity = Math.min(1, obj.intensity + 0.1);
         }
-        // Find max count for normalization
-        let maxCount = 0;
-        for (let r = 0; r < gridRows; r++) {
-            for (let c = 0; c < gridCols; c++) {
-                if (grid[r][c] > maxCount) maxCount = grid[r][c];
-            }
-        }
-        // Set intensity: 1 if significant (e.g. > 90th percentile), else normalized
-        let allCounts = grid.flat();
-        let sorted = [...allCounts].sort((a, b) => a - b);
-        let crazyThreshold = sorted[Math.floor(0.9 * sorted.length)];
-        let heatArray = [];
-        for (let r = 0; r < gridRows; r++) {
-            for (let c = 0; c < gridCols; c++) {
-                // Center coordinate of cell
-                let centerLat = minLat + (r + 0.5) * latStep;
-                let centerLng = minLng + (c + 0.5) * lngStep;
-                let count = grid[r][c];
-                let intensity = 0;
-                if (count >= crazyThreshold && count > 0) {
-                    intensity = 1;
-                } else if (maxCount > 0) {
-                    intensity = count / maxCount;
-                }
-                // Only include cells with at least some intensity
-                if (intensity > 0) {
-                    heatArray.push([centerLat, centerLng, intensity]);
-                }
-            }
-        }
+        const heatArray = Array.from(coordMap.values()).map(({ lat, lng, intensity }) => [lat, lng, intensity]);
         res.json({ message: "Map area data (last 3 months)", heat: heatArray });
+
+        // Helper: point-in-polygon (ray-casting algorithm)
+        function pointInPolygon(lat, lng, polygon) {
+            let inside = false;
+            for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
+                const xi = polygon[i].lat, yi = polygon[i].lng;
+                const xj = polygon[j].lat, yj = polygon[j].lng;
+                const intersect = ((yi > lng) !== (yj > lng)) &&
+                    (lat < (xj - xi) * (lng - yi) / (yj - yi + 1e-12) + xi);
+                if (intersect) inside = !inside;
+            }
+            return inside;
+        }
     }
 
     return {
