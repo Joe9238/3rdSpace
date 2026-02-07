@@ -4,6 +4,8 @@ import 'leaflet/dist/leaflet.css';
 import markerShadow from 'leaflet/dist/images/marker-shadow.png';
 import heatOnPng from '../images/heat-on.png';
 import heatOffPng from '../images/heat-off.png';
+import favOnPng from '../images/favourite-on.png';
+import favOffPng from '../images/favourite-off.png';
 import 'leaflet.heat';
 
 // Helper to create colored marker icons
@@ -56,8 +58,11 @@ const CombinedMap = ({ publicSpaces = [] }) => {
   const [showUserMarkers, setShowUserMarkers] = useState(true);
   const [popup, setPopup] = useState(null);
   const [placeName, setPlaceName] = useState('');
+  const [airData, setAirData] = useState([]); 
+  const [showAirQuality, setShowAirQuality] = useState(false);
   
-  // NEW: State for Amenities
+
+  // State for Amenities
   const [amenityPopup, setAmenityPopup] = useState(null); 
 
   // Heatmap options
@@ -69,6 +74,8 @@ const CombinedMap = ({ publicSpaces = [] }) => {
     if (zoom >= 14) return 2.2;
     return 0.3;
   };
+
+  // Handle deletion of a saved location
   const handleDelete = async (id) => {
     if (!id) return;
     try {
@@ -82,9 +89,9 @@ const CombinedMap = ({ publicSpaces = [] }) => {
     } catch (err) {
       console.error("Delete failed", err);
     }
-};
+  };
 
-  // NEW: Fetch amenities from Overpass API
+  // Fetch amenities from Overpass API
   const fetchAmenities = async (lat, lng, radius = 400) => {
     const amenityTypes = [
       "pub", "bar", "restaurant", "cafe", "fast_food", "nightclub",
@@ -117,11 +124,12 @@ const CombinedMap = ({ publicSpaces = [] }) => {
       return [];
     }
   };
+
+
   useEffect(() => {
   const syncDatabase = async () => {
     try {
       const response = await fetch('/api/location/saved', {
-        // This is the most important line for Cookie-based Auth
         credentials: 'include' 
       });
 
@@ -324,15 +332,19 @@ const CombinedMap = ({ publicSpaces = [] }) => {
             <img src={showHeat ? heatOnPng : heatOffPng} alt="toggle" style={{ width: 40, height: 40 }} />
           </button>
           <span>Show Heatmap</span>
+          
         </div>
-        
-        <label style={{ marginBottom: 16 }}>
-          <input type="checkbox" checked={showUserMarkers} onChange={e => setShowUserMarkers(e.target.checked)} /> Show My Saved Places
-        </label>
+        <div style={{ display: 'flex', alignItems: 'center', marginBottom: 16 }}>
+          <button onClick={() => setShowUserMarkers(!showUserMarkers)} style={{ background: 'none', border: 'none', cursor: 'pointer', marginRight: 8 }}>
+            <img src={showUserMarkers ? favOnPng : favOffPng} alt="toggle" style={{ width: 40, height: 40 }} />
+          </button>
+          <span>Show Saved Places</span>
+        </div>
+
 
         <hr style={{ width: '100%', border: '0.5px solid #eee' }} />
 
-        {/* NEW: Amenities List Section */}
+        {/* Amenities List Section */}
         <div style={{ marginTop: 8 }}>
           <div style={{ fontWeight: 600, fontSize: 17, marginBottom: 8 }}>Amenities Nearby</div>
           {amenityPopup && amenityPopup.amenities === null && <div style={{ color: '#888' }}>Loading...</div>}
