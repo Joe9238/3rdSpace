@@ -87,7 +87,7 @@ export default function Security( { onLogout } ) {
             setDeleteError("Password is required.");
             return;
         }
-        if (!window.confirm("Are you sure you want to delete your account and all your bookings? This cannot be undone.")) {
+        if (!window.confirm("Are you sure you want to delete your account? This cannot be undone.")) {
             return;
         }
         setDeleteLoading(true);

@@ -26,20 +26,7 @@ function Login({ onLogin }) {
 
       if (onLogin) onLogin(); // call to app.js to update auth state (for navbar)
 
-      try {
-        const checkRes = await fetch(`/api/rooms/validate`, {
-          method: "GET",
-          credentials: "include"
-        });
-        const body = await checkRes.json().catch(() => ({}));
-        if (body.hasPendingReservation) {
-          navigate("/payment");
-        } else {
-          navigate("/profile");
-        }
-      } catch {
-        navigate("/profile");
-      }
+      navigate("/profile");
     } catch (err) {
       setError(err.message || "Login failed");
     }

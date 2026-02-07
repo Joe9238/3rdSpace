@@ -1,6 +1,5 @@
 import { useState } from 'react';
 import { authRequest } from '../utils/AuthRequest';
-import Booking from '../Components/Bookings.js';
 import Security from '../Components/Security.js';
 import PersonalInfo from '../Components/PersonalInfo.js';
 

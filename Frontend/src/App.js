@@ -1,14 +1,11 @@
 import logo from './logo.png';
 import './App.css';
 import { useEffect, useState } from 'react';
-import RoomsList from './Components/RoomsList';
 import Login from './Pages/Login';
 import Profile from './Pages/Profile';
 import { BrowserRouter, Routes, Route, Link } from 'react-router-dom';
 import RequireAuth from './utils/RequireAuth';
 import { authRequest } from './utils/AuthRequest';
-import Payment from './Components/Payment';
-import RequireReservation from './utils/RequireReservation';
 import Register from './Pages/Register';
 import { useNavigate } from 'react-router-dom';
 
