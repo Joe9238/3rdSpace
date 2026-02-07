@@ -25,6 +25,45 @@ const Map = ({ publicSpaces = [] }) => {
 	const fetchTimeout = useRef(null);
 	// Local cache for heat data, keyed by rounded bounds
 	const heatCache = useRef({});
+	// Amenity popup state
+	const [amenityPopup, setAmenityPopup] = useState(null); // {lat, lng, amenities}
+			// Fetch amenities from Overpass API
+			const fetchAmenities = async (lat, lng, radius = 400) => {
+				const amenityTypes = [
+					"pub", "bar", "restaurant", "cafe", "fast_food", "nightclub",
+					"cinema", "theatre", "arts_centre", "museum", "library",
+					"supermarket", "bakery"
+				];
+				const query = `
+					[out:json];
+					(
+						${amenityTypes.map(type => `
+							node["amenity"="${type}"](around:${radius},${lat},${lng});
+							way["amenity"="${type}"](around:${radius},${lat},${lng});
+							relation["amenity"="${type}"](around:${radius},${lat},${lng});
+						`).join('')}
+						node["shop"](around:${radius},${lat},${lng});
+						way["shop"](around:${radius},${lat},${lng});
+						relation["shop"](around:${radius},${lat},${lng});
+					);
+					out center;
+				`;
+				const url = 'https://overpass-api.de/api/interpreter';
+				const res = await fetch(url, {
+					method: 'POST',
+					body: query,
+					headers: { 'Content-Type': 'text/plain' }
+				});
+				const data = await res.json();
+				// Filter results to only visitable places
+				return data.elements.filter(a => {
+					const amenity = a.tags && a.tags.amenity;
+					const shop = a.tags && a.tags.shop;
+					return (
+						(amenity && amenityTypes.includes(amenity)) || shop
+					);
+				});
+			};
 		// Fixed heatmap options
 		const radius = 55;
 		const blur = 70;
@@ -133,14 +172,24 @@ const Map = ({ publicSpaces = [] }) => {
 		const onZoom = () => setZoomLevel(leafletMap.current.getZoom());
 		leafletMap.current.on('zoomend', onZoom);
 
+		// Listen for map click to fetch amenities
+		leafletMap.current.on('click', async e => {
+			const { lat, lng } = e.latlng;
+			setAmenityPopup({ lat, lng, amenities: null }); // Show loading
+			const amenities = await fetchAmenities(lat, lng);
+			setAmenityPopup({ lat, lng, amenities });
+		});
+
 		// Set initial zoom
 		setZoomLevel(leafletMap.current.getZoom());
 
 		return () => {
 			leafletMap.current.off('moveend', onMoveEnd);
 			leafletMap.current.off('zoomend', onZoom);
+			leafletMap.current.off('click');
 		};
 	}, []);
+	// Remove popup logic; amenities will be shown in sidebar
 
 	// Add/remove public space markers
 	useEffect(() => {
@@ -189,7 +238,7 @@ const Map = ({ publicSpaces = [] }) => {
 	return (
 		<div style={{ display: 'flex', flexDirection: 'row', alignItems: 'flex-start' }}>
 			<div ref={mapRef} style={{ height: 750, width: 750 }} />
-			<div style={{ marginLeft: 24, display: 'flex', flexDirection: 'column', alignItems: 'flex-start', height: 750 }}>
+			<div style={{ marginLeft: 24, display: 'flex', flexDirection: 'column', alignItems: 'flex-start', height: 750, width: 350, background: '#fafafa', borderRadius: 8, boxShadow: '0 2px 8px rgba(0,0,0,0.07)', padding: 16 }}>
 				<div style={{ display: 'flex', alignItems: 'center', marginBottom: 16 }}>
 					<button
 						onClick={() => setShowHeat(h => !h)}
@@ -210,6 +259,39 @@ const Map = ({ publicSpaces = [] }) => {
 						/>
 					</button>
 					<span style={{ fontSize: 18, userSelect: 'none' }}>Show Heatmap</span>
+				</div>
+				<div style={{ marginTop: 8, width: '100%' }}>
+					<div style={{ fontWeight: 600, fontSize: 17, marginBottom: 8 }}>Amenities Nearby</div>
+					{amenityPopup && amenityPopup.amenities === null && (
+						<div style={{ color: '#888', fontStyle: 'italic' }}>Loading amenities...</div>
+					)}
+					{amenityPopup && amenityPopup.amenities && amenityPopup.amenities.length === 0 && (
+						<div style={{ color: '#888', fontStyle: 'italic' }}>No amenities found.</div>
+					)}
+					{amenityPopup && amenityPopup.amenities && amenityPopup.amenities.length > 0 && (
+						<ul style={{ margin: 0, paddingLeft: 18 }}>
+							{amenityPopup.amenities.slice(0, 10).map((a, idx) => {
+								const name = a.tags && a.tags.name ? a.tags.name : '(Unnamed)';
+								const type = a.tags && a.tags.amenity ? a.tags.amenity : (a.tags && a.tags.shop ? a.tags.shop : 'Amenity');
+								const desc = a.tags && (a.tags.description || a.tags.note || a.tags['addr:housename'] || a.tags['addr:housenumber']) ?
+									(a.tags.description || a.tags.note || a.tags['addr:housename'] || a.tags['addr:housenumber']) : '';
+								const latVal = a.lat || (a.center && a.center.lat);
+								const lngVal = a.lon || (a.center && a.center.lon);
+								return (
+									<li key={idx} style={{ marginBottom: 8 }}>
+										<b>{name}</b> <span style={{ color: '#888' }}>({type})</span>
+										{desc && <div style={{ fontSize: 13, color: '#555', marginTop: 2 }}>{desc}</div>}
+										<div style={{ fontSize: 12, color: '#888', marginTop: 2 }}>
+											Lat: {latVal ? latVal.toFixed(5) : '—'}<br />Lng: {lngVal ? lngVal.toFixed(5) : '—'}
+										</div>
+									</li>
+								);
+							})}
+						</ul>
+					)}
+					{amenityPopup && amenityPopup.amenities && amenityPopup.amenities.length > 10 && (
+						<div style={{ marginTop: 8, color: '#888' }}>+{amenityPopup.amenities.length - 10} more...</div>
+					)}
 				</div>
 			</div>
 		</div>
