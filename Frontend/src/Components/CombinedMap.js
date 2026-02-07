@@ -6,6 +6,7 @@ import heatOnPng from '../images/heat-on.png';
 import heatOffPng from '../images/heat-off.png';
 import favOnPng from '../images/favourite-on.png';
 import favOffPng from '../images/favourite-off.png';
+import Panel from "../Components/panel";
 import 'leaflet.heat';
 
 // Helper to create colored marker icons
@@ -60,9 +61,7 @@ const CombinedMap = ({ publicSpaces = [] }) => {
   const [placeName, setPlaceName] = useState('');
   const [airData, setAirData] = useState([]); 
   const [showAirQuality, setShowAirQuality] = useState(false);
-  
-
-  // State for Amenities
+  const [isOpen, setIsOpen] = useState(false);
   const [amenityPopup, setAmenityPopup] = useState(null); 
 
   // Heatmap options
@@ -93,24 +92,54 @@ const CombinedMap = ({ publicSpaces = [] }) => {
 
   // Fetch amenities from Overpass API
   const fetchAmenities = async (lat, lng, radius = 400) => {
-    const amenityTypes = [
-      "pub", "bar", "restaurant", "cafe", "fast_food", "nightclub",
-      "cinema", "theatre", "arts_centre", "museum", "library", "bakery"
-    ];
-    const query = `
-      [out:json];
-      (
-        ${amenityTypes.map(type => `
-          node["amenity"="${type}"](around:${radius},${lat},${lng});
-          way["amenity"="${type}"](around:${radius},${lat},${lng});
-          relation["amenity"="${type}"](around:${radius},${lat},${lng});
-        `).join('')}
-        node["shop"](around:${radius},${lat},${lng});
-        way["shop"](around:${radius},${lat},${lng});
-        relation["shop"](around:${radius},${lat},${lng});
-      );
-      out center;
-    `;
+ const amenityTypes = [
+						"pub", "bar", "restaurant", "cafe", "fast_food", "biergarten", "ice_cream",
+
+						"cinema", "theatre", "arts_centre", "museum", "library", "karaoke_box",
+						"nightclub", "escape_game", "bowling_alley",
+						"community_centre", "social_centre", "youth_centre",
+						"townhall", "public_bookcase", "cultural_centre", "community_hall",
+
+						"bakery",
+
+						"park", "garden", "recreation_ground", "playground", "common",
+						"dog_park", "pitch", "golf_course", "outdoor_seating",
+
+						"beach", "nature_reserve"
+
+				];
+				const tags = ["amenity", "leisure", "natural", "landuse"];
+				const query = `
+					[out:json];
+					(
+				${tags.map( tag =>
+				       amenityTypes.map(type => `
+							node["${tag}"="${type}"](around:${radius},${lat},${lng});
+							way["${tag}"="${type}"](around:${radius},${lat},${lng});
+							relation["${tag}"="${type}"](around:${radius},${lat},${lng});
+							`)
+							.join("")
+					)
+						.join("")}
+					node["leisure"="nature_reserve"](around:${radius},${lat},${lng});
+					way["leisure"="nature_reserve"](around:${radius},${lat},${lng});
+					relation["leisure"="nature_reserve"](around:${radius},${lat},${lng});
+
+					node["natural"](around:${radius},${lat},${lng});
+					way["natural"](around:${radius},${lat},${lng});
+					relation["natural"](around:${radius},${lat},${lng});
+					);
+
+					node["boundary"="protected_area"]["protect_class"="2"](around:${radius},${lat},${lng});
+					way["boundary"="protected_area"]["protect_class"="2"](around:${radius},${lat},${lng});
+					relation["boundary"="protected_area"]["protect_class"="2"](around:${radius},${lat},${lng});
+
+					node["boundary"="national_park"](around:${radius},${lat},${lng});
+					way["boundary"="national_park"](around:${radius},${lat},${lng});
+					relation["boundary"="national_park"](around:${radius},${lat},${lng});
+
+					out center;
+				`;
     try {
       const res = await fetch('https://overpass-api.de/api/interpreter', {
         method: 'POST',
@@ -207,15 +236,12 @@ const CombinedMap = ({ publicSpaces = [] }) => {
     });
     leafletMap.current.on('zoomend', () => setZoomLevel(leafletMap.current.getZoom()));
 
-    // UPDATED: Click handler does both Save Location and Fetch Amenities
     leafletMap.current.on('click', async e => {
       const { lat, lng } = e.latlng;
-      // 1. Logic for Saving Location
       setPopup({ lat, lng });
       setPlaceName('');
-      
-      // 2. Logic for Sidebar Amenities
-      setAmenityPopup({ lat, lng, amenities: null }); // Show loading
+      setIsOpen(true); 
+      setAmenityPopup({ lat, lng, amenities: null }); 
       const amenities = await fetchAmenities(lat, lng);
       setAmenityPopup({ lat, lng, amenities });
     });
@@ -340,27 +366,18 @@ const CombinedMap = ({ publicSpaces = [] }) => {
           </button>
           <span>Show Saved Places</span>
         </div>
+ </div>
 
-
-        <hr style={{ width: '100%', border: '0.5px solid #eee' }} />
-
-        {/* Amenities List Section */}
-        <div style={{ marginTop: 8 }}>
-          <div style={{ fontWeight: 600, fontSize: 17, marginBottom: 8 }}>Amenities Nearby</div>
-          {amenityPopup && amenityPopup.amenities === null && <div style={{ color: '#888' }}>Loading...</div>}
-          {amenityPopup && amenityPopup.amenities && amenityPopup.amenities.length === 0 && <div style={{ color: '#888' }}>No amenities found.</div>}
-          {amenityPopup && amenityPopup.amenities && (
-            <ul style={{ paddingLeft: 18 }}>
-              {amenityPopup.amenities.slice(0, 10).map((a, idx) => (
-                <li key={idx} style={{ marginBottom: 10 }}>
-                  <strong>{a.tags.name || '(Unnamed)'}</strong> <span style={{ color: '#888', fontSize: 12 }}>({a.tags.amenity || a.tags.shop})</span>
-                  <div style={{ fontSize: 11, color: '#999' }}>Lat: {(a.lat || a.center.lat).toFixed(4)} Lng: {(a.lon || a.center.lon).toFixed(4)}</div>
-                </li>
-              ))}
-            </ul>
-          )}
-        </div>
-      </div>
+        {amenityPopup && (
+					<Panel
+					    key={`${amenityPopup?.lat}-${amenityPopup?.lng}`}
+						isOpen={isOpen}
+						closePanel={() => setIsOpen(false)}
+						amenities={amenityPopup.amenities}
+					/>
+                    )}
+                  
+     
     </div>
   );
 };

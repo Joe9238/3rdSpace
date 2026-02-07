@@ -11,9 +11,22 @@ function Panel({isOpen, closePanel, amenities}){
 
 
       const ThirdspaceCard = ({ amenity}) => {
-        
+
+
         const name = amenity.tags.name && amenity.tags ? amenity.tags.name  : "no name";
-        const type =amenity.tags && amenity.tags.amenity ? amenity.tags.amenity : (amenity.tags && amenity.tags.leisure ? amenity.tags.leisure : 'Amenity')
+       const tags = amenity.tags || {};
+
+            const type =
+            tags.amenity ||
+            tags.leisure ||
+            tags.shop ||
+            tags.natural ||
+            tags.landuse ||
+            (tags.boundary === "protected_area" && tags.protect_class === "2"
+                ? "national_park"
+                : null) ||
+            tags.boundary ||
+            "Amenity";
          if (!lat || !lon) return null;
         const lat = amenity.lat || (amenity.center && amenity.center.lat)
         const lon = amenity.lon || (amenity.center && amenity.center.lon)  
