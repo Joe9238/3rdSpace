@@ -37,13 +37,14 @@ services:
     restart: always
     environment:
       MYSQL_ROOT_PASSWORD: rootpassword
-      MYSQL_DATABASE: uop_db
+      MYSQL_DATABASE: 3rdSpace
       MYSQL_USER: uop_user
       MYSQL_PASSWORD: uop_pass
     ports:
       - "3306:3306"
     volumes:
       - mysql_data:/var/lib/mysql
+      - ./database/init.sql:/docker-entrypoint-initdb.d/init.sql
 
   phpmyadmin:
     image: phpmyadmin/phpmyadmin:latest
