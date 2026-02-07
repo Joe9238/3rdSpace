@@ -1,0 +1,17 @@
+.Panel-container{
+    display: block;
+    height: 100svh;
+    width: 500px;
+    border: 10px;
+    border-color: 10px solid black;
+    position: absolute;
+    right: 0%;
+}
+
+.exit{
+    display: block;
+    height: 30px;
+    width: 30px; 
+    text-align: 20px
+   
+}

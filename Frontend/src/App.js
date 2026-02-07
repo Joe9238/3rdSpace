@@ -8,6 +8,7 @@ import RequireAuth from './utils/RequireAuth';
 import { authRequest } from './utils/AuthRequest';
 import Register from './Pages/Register';
 import { useNavigate } from 'react-router-dom';
+import Map from './Pages/Map';
 
 function AppWrapper() {
   return (
@@ -53,7 +54,11 @@ function App() {
       <nav className="App-nav">
         <Link to="/"><img src={logo} id="logo" className="App-logo" alt="logo" /></Link>
         {isAuthenticated ? (
+         <div>
           <Link to="/profile" className="nav-button">Profile</Link>
+           <Link to="/map" className="nav-button">Map</Link>
+          </div>
+       
         ) : (
           <div>
             <Link to="/register" className="nav-button" style={{ paddingRight: "20px" }}>Register</Link>
@@ -71,6 +76,14 @@ function App() {
           element={
             <RequireAuth onAuthChange={setIsAuthenticated}>
               <Profile onLogout={handleLogout} />
+            </RequireAuth>
+          }
+        />
+        <Route
+          path="/map"
+          element={
+            <RequireAuth onAuthChange={setIsAuthenticated}>
+            <Map/>
             </RequireAuth>
           }
         />
