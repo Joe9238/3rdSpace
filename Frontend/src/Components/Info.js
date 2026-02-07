@@ -5,11 +5,11 @@ export default function Info({ onLogout }) {
     const [message, setMessage] = useState("");
     const [error, setError] = useState("");
     const [loading, setLoading] = useState(false);
-    const [result, Result] = useState("");
+    const [result, setResult] = useState("");
     const savedPlaces = [
-    "Drake Circus", 
-    "Mcdonalds George Street", 
-    "The Hoe"
+        "Drake Circus", 
+        "Mcdonalds George Street", 
+        "The Hoe"
     ];
 
     const InfoRefresh = async (e) => {
@@ -22,12 +22,12 @@ export default function Info({ onLogout }) {
                 method: "GET",
                 headers: { "Content-Type": "application/json" }
             });
-            const data = await res.json();
             if (res.ok){
                 const actualResult = await res.text();
-                Result(actualResult);
+                setResult(actualResult);
                 setMessage("Refreshed Successfully");
             } else {
+                const data = await res.json();
                 setError(data.error || "Failed to Refresh");
             }        
         } catch (err) {
@@ -39,14 +39,18 @@ export default function Info({ onLogout }) {
 
     return(
         <div>
-            <button onClick={InfoRefresh}>⟳</button>
-            <h1>{Result}</h1>
+            <button onClick={InfoRefresh} disabled={loading}>⟳</button>
+            {message && <div style={{ color: 'green' }}>{message}</div>}
+            {error && <div style={{ color: 'red' }}>{error}</div>}
+            <h1>{result}</h1>
             <p>Stats..: </p>
             <p>Saved Places NUM, Visted Places: NUM</p>
             <p>List saved places: </p>
-            <ul>{savedPlaces.map(place => 
-            <li>{place}</li>
-            )}</ul>
+            <div>
+                {savedPlaces.map((place, idx) => (
+                    <div key={idx} style={{ marginBottom: 4 }}>{place}</div>
+                ))}
+            </div>
         </div>
     );
 
