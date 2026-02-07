@@ -32,7 +32,7 @@ const Map = ({ publicSpaces = [] }) => {
 				const amenityTypes = [
 					"pub", "bar", "restaurant", "cafe", "fast_food", "nightclub",
 					"cinema", "theatre", "arts_centre", "museum", "library",
-					"supermarket", "bakery"
+					"bakery"
 				];
 				const query = `
 					[out:json];

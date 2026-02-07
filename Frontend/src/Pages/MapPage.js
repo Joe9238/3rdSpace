@@ -1,5 +1,5 @@
 
-import Map from '../Components/CombinedMap';
+import Map from '../Components/CombinedMap.js';
 
 function MapPage() {
     return <Map />;

@@ -1,8 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
-import markerIcon2x from 'leaflet/dist/images/marker-icon-2x.png';
-import markerIcon from 'leaflet/dist/images/marker-icon.png';
 import markerShadow from 'leaflet/dist/images/marker-shadow.png';
 import heatOnPng from '../images/heat-on.png';
 import heatOffPng from '../images/heat-off.png';
@@ -21,9 +19,31 @@ function createColoredIcon(color) {
   });
 }
 
-const defaultIcon = createColoredIcon('red'); // fallback
+const createPopUpContent = (loc) => {
+  const { name: displayName, latitude, longitude, lat, lng, id } = loc;
+  const finalName = displayName || 'Saved Place';
+  const displayLat = (latitude ?? lat ?? 0).toFixed(5);
+  const displayLng = (longitude ?? lng ?? 0).toFixed(5);
 
-// Combined map: shows heatmap, public spaces, saved locations, and events
+  return `
+    <div style="padding: 4px; min-width: 140px;">
+      <strong style="font-size: 14px; color: #333;">${finalName}</strong><br/>
+      <div style="font-size: 11px; color: #666; margin-top: 4px; border-bottom: 1px solid #eee; padding-bottom: 4px; margin-bottom: 4px;">
+        Lat: ${displayLat}<br/>
+        Lng: ${displayLng}
+      </div>
+      <button id="pop-del-${id}" style="width: 100%; background: #ff4d4f; color: white; border: none; border-radius: 4px; padding: 4px; cursor: pointer;">
+        Remove
+      </button>
+    </div>
+  `;
+};
+
+
+
+
+
+const defaultIcon = createColoredIcon('red');
 
 const CombinedMap = ({ publicSpaces = [] }) => {
   const mapRef = useRef(null);
@@ -36,6 +56,9 @@ const CombinedMap = ({ publicSpaces = [] }) => {
   const [showUserMarkers, setShowUserMarkers] = useState(true);
   const [popup, setPopup] = useState(null);
   const [placeName, setPlaceName] = useState('');
+  
+  // NEW: State for Amenities
+  const [amenityPopup, setAmenityPopup] = useState(null); 
 
   // Heatmap options
   const radius = 55;
@@ -46,11 +69,77 @@ const CombinedMap = ({ publicSpaces = [] }) => {
     if (zoom >= 14) return 2.2;
     return 0.3;
   };
+  const handleDelete = async (id) => {
+    if (!id) return;
+    try {
+      const response = await fetch(`/api/location/delete/${id}`, {
+        method: 'DELETE',
+        credentials: 'include'
+      });
+      if (response.ok) {
+        setLocations(prev => prev.filter(l => l.id !== id));
+      }
+    } catch (err) {
+      console.error("Delete failed", err);
+    }
+};
 
-  // Helper: get heat value at a location
+  // NEW: Fetch amenities from Overpass API
+  const fetchAmenities = async (lat, lng, radius = 400) => {
+    const amenityTypes = [
+      "pub", "bar", "restaurant", "cafe", "fast_food", "nightclub",
+      "cinema", "theatre", "arts_centre", "museum", "library", "bakery"
+    ];
+    const query = `
+      [out:json];
+      (
+        ${amenityTypes.map(type => `
+          node["amenity"="${type}"](around:${radius},${lat},${lng});
+          way["amenity"="${type}"](around:${radius},${lat},${lng});
+          relation["amenity"="${type}"](around:${radius},${lat},${lng});
+        `).join('')}
+        node["shop"](around:${radius},${lat},${lng});
+        way["shop"](around:${radius},${lat},${lng});
+        relation["shop"](around:${radius},${lat},${lng});
+      );
+      out center;
+    `;
+    try {
+      const res = await fetch('https://overpass-api.de/api/interpreter', {
+        method: 'POST',
+        body: query,
+        headers: { 'Content-Type': 'text/plain' }
+      });
+      const data = await res.json();
+      return data.elements;
+    } catch (e) {
+      console.error("Overpass error", e);
+      return [];
+    }
+  };
+  useEffect(() => {
+  const syncDatabase = async () => {
+    try {
+      const response = await fetch('/api/location/saved', {
+        // This is the most important line for Cookie-based Auth
+        credentials: 'include' 
+      });
+
+      const data = await response.json();
+
+      // Your controller wraps the array in a 'locations' key
+      if (data && data.locations) {
+        setLocations(data.locations);
+      }
+    } catch (err) {
+      console.error("Sync failed. Check if your cookie is expired.");
+    }
+  };
+  syncDatabase();
+  }, []);
+
   function getHeatAtLocation(lat, lng) {
     if (!heatData || heatData.length === 0) return 0;
-    // Find closest heat point
     let minDist = Infinity;
     let value = 0;
     for (const [hLat, hLng, hVal] of heatData) {
@@ -63,7 +152,6 @@ const CombinedMap = ({ publicSpaces = [] }) => {
     return value;
   }
 
-  // Fetch heat data for bounds
   const fetchHeatData = async (bounds) => {
     if (!bounds) return;
     const sw = bounds.getSouthWest();
@@ -75,22 +163,14 @@ const CombinedMap = ({ publicSpaces = [] }) => {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          topLeftLat: nw.lat,
-          topLeftLong: nw.lng,
-          topRightLat: ne.lat,
-          topRightLong: ne.lng,
-          bottomRightLat: se.lat,
-          bottomRightLong: se.lng,
-          bottomLeftLat: sw.lat,
-          bottomLeftLong: sw.lng,
+          topLeftLat: nw.lat, topLeftLong: nw.lng,
+          topRightLat: ne.lat, topRightLong: ne.lng,
+          bottomRightLat: se.lat, bottomRightLong: se.lng,
+          bottomLeftLat: sw.lat, bottomLeftLong: sw.lng,
         }),
       });
       const data = await res.json();
-      if (data && Array.isArray(data.heat)) {
-        setHeatData(data.heat);
-      } else {
-        setHeatData([]);
-      }
+      setHeatData(data && Array.isArray(data.heat) ? data.heat : []);
     } catch (e) {
       setHeatData([]);
     }
@@ -98,10 +178,7 @@ const CombinedMap = ({ publicSpaces = [] }) => {
 
   useEffect(() => {
     if (!mapRef.current || leafletMap.current) return;
-    const ukBounds = L.latLngBounds(
-      L.latLng(49.4, -12),
-      L.latLng(59.0, 2.5)
-    );
+    const ukBounds = L.latLngBounds(L.latLng(49.4, -12), L.latLng(59.0, 2.5));
     leafletMap.current = L.map(mapRef.current, {
       center: [51.5, -1.0],
       zoom: 6,
@@ -109,23 +186,32 @@ const CombinedMap = ({ publicSpaces = [] }) => {
       maxBoundsViscosity: 1,
     });
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-      attribution: '&copy; <a href="http://www.openstreetmap.org/copyright">OpenStreetMap</a>',
+      attribution: '&copy; OpenStreetMap',
       maxZoom: 19,
       minZoom: 6,
     }).addTo(leafletMap.current);
+
     fetchHeatData(leafletMap.current.getBounds());
+
     leafletMap.current.on('moveend', () => {
       fetchHeatData(leafletMap.current.getBounds());
       setZoomLevel(leafletMap.current.getZoom());
     });
     leafletMap.current.on('zoomend', () => setZoomLevel(leafletMap.current.getZoom()));
-    setZoomLevel(leafletMap.current.getZoom());
-    // Add click handler for saving locations
-    leafletMap.current.on('click', e => {
+
+    // UPDATED: Click handler does both Save Location and Fetch Amenities
+    leafletMap.current.on('click', async e => {
       const { lat, lng } = e.latlng;
+      // 1. Logic for Saving Location
       setPopup({ lat, lng });
       setPlaceName('');
+      
+      // 2. Logic for Sidebar Amenities
+      setAmenityPopup({ lat, lng, amenities: null }); // Show loading
+      const amenities = await fetchAmenities(lat, lng);
+      setAmenityPopup({ lat, lng, amenities });
     });
+
     return () => {
       leafletMap.current.off('moveend');
       leafletMap.current.off('zoomend');
@@ -133,133 +219,95 @@ const CombinedMap = ({ publicSpaces = [] }) => {
     };
   }, []);
 
-  // Add/remove markers (public spaces, saved locations)
+  // Marker management (Public + User Saved)
   useEffect(() => {
     if (!leafletMap.current) return;
     if (leafletMap.current._markers) {
       leafletMap.current._markers.forEach(m => m.remove());
     }
-    // Public spaces (default icon)
+    
+
     const publicMarkers = publicSpaces.map(space => {
+
       if (space.lat == null || space.lng == null) return null;
       const marker = L.marker([space.lat, space.lng], { icon: defaultIcon }).addTo(leafletMap.current);
-      let popupContent = '';
-      if (space.name) popupContent += `<strong>${space.name}</strong><br/>`;
-      popupContent += `Lat: ${space.lat.toFixed(5)}<br/>Lng: ${space.lng.toFixed(5)}`;
-      marker.bindPopup(popupContent);
+      marker.bindPopup(createPopUpContent(space));
       return marker;
     }).filter(Boolean);
-    // User-saved places (colored icon based on heat)
-    const placeMarkers = showUserMarkers ? locations.map(loc => {
-      const heatVal = getHeatAtLocation(loc.lat, loc.lng);
-      // Map heat value to color: yellow (low) to red (high)
-      let color = 'yellow';
-      if (heatVal > 0.7) color = 'red';
-      else if (heatVal > 0.4) color = 'orange';
-      else if (heatVal > 0.15) color = 'gold';
+
+
+  const placeMarkers = locations.map(loc => {
+    
+    const lat = loc.latitude ?? loc.lat;
+    const lng = loc.longitude ?? loc.lng;
+    const heatVal = getHeatAtLocation(lat, lng);
+    let color = 'yellow';
+      if (heatVal > 0.4) color = 'red';
+      else if (heatVal > 0.2) color = 'orange';
       else color = 'yellow';
       const icon = createColoredIcon(color);
-      const marker = L.marker([loc.lat, loc.lng], { icon }).addTo(leafletMap.current);
-      let popupContent = '';
-      if (loc.name) popupContent += `<strong>${loc.name}</strong><br/>`;
-      popupContent += `Lat: ${loc.lat.toFixed(5)}<br/>Lng: ${loc.lng.toFixed(5)}`;
-      popupContent += `<br/>Heat: ${heatVal.toFixed(2)}`;
-      marker.bindPopup(popupContent);
-      return marker;
-    }) : [];
+    if (lat == null || lng == null) return null;
+
+    const marker = L.marker([lat, lng], { icon: icon }).addTo(leafletMap.current);
+  
+    marker.bindPopup(createPopUpContent(loc));
+
+  marker.on('popupopen', () => {
+    const btn = document.getElementById(`pop-del-${loc.id}`);
+    if (btn) {
+      // Attach the click handler to the raw DOM element
+      btn.onclick = () => {
+        handleDelete(loc.id);
+        leafletMap.current.closePopup(); // Close the popup after clicking
+      };
+    }
+  });
+
+  return marker;
+}).filter(Boolean);
+
     leafletMap.current._markers = [...publicMarkers, ...placeMarkers];
   }, [publicSpaces, locations, showUserMarkers, heatData]);
 
-  // Add/remove heat layer
+  // Heat Layer management
   useEffect(() => {
-    if (!leafletMap.current) return;
-    if (!window.L || !window.L.heatLayer) return;
-    if (heatLayerRef.current) {
-      heatLayerRef.current.remove();
-      heatLayerRef.current = null;
-    }
-    if (showHeat && heatData && heatData.length > 0 && zoomLevel >= 14) {
-      const gradient = {
-        0.0: '#fff5f5',
-        0.2: '#ffcccc',
-        0.4: '#ff9999',
-        0.6: '#ff5555',
-        0.8: '#ff2222',
-        1.0: '#ff0000',
-      };
-      const maxIntensity = getMaxIntensity(zoomLevel);
+    if (!leafletMap.current || !window.L.heatLayer) return;
+    if (heatLayerRef.current) heatLayerRef.current.remove();
+
+    if (showHeat && heatData.length > 0 && zoomLevel >= 14) {
       heatLayerRef.current = window.L.heatLayer(heatData, {
-        radius,
-        blur,
-        maxZoom: 17,
-        gradient,
-        max: maxIntensity,
+        radius, blur, maxZoom: 17,
+        gradient: { 0.4: '#ff9999', 0.8: '#ff2222', 1.0: '#ff0000' },
+        max: getMaxIntensity(zoomLevel),
       }).addTo(leafletMap.current);
     }
   }, [heatData, showHeat, zoomLevel]);
 
-  // Handle popup form submission for saving locations
   const handlePopupSubmit = async (e) => {
     e.preventDefault();
     if (!popup || !placeName.trim()) return;
     const newLoc = { lat: popup.lat, lng: popup.lng, name: placeName.trim() };
     setLocations(prev => [...prev, newLoc]);
     setPopup(null);
-    setPlaceName('');
     try {
-      await fetch('/api/save-location', {
+      await fetch('/api/location/save', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(newLoc)
       });
-    } catch (err) {
-      console.error('Failed to save location:', err);
-    }
+    } catch (err) { console.error(err); }
   };
 
   return (
     <div style={{ display: 'flex', flexDirection: 'row', alignItems: 'flex-start' }}>
       <div style={{ position: 'relative', width: 750, height: 750 }}>
         <div ref={mapRef} style={{ height: 750, width: 750 }} />
+        {/* Save Location Overlay Form */}
         {popup && (
-          <div style={{
-            position: 'absolute',
-            left: 0,
-            top: 0,
-            width: '100%',
-            height: '100%',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            background: 'rgba(0,0,0,0.2)',
-            zIndex: 1000,
-          }}>
-            <form
-              onSubmit={handlePopupSubmit}
-              style={{
-                background: '#fff',
-                padding: 24,
-                borderRadius: 8,
-                boxShadow: '0 2px 8px rgba(0,0,0,0.2)',
-                display: 'flex',
-                flexDirection: 'column',
-                minWidth: 300,
-              }}
-            >
-              <label style={{ marginBottom: 8 }}>
-                Place Name:
-                <input
-                  type="text"
-                  value={placeName}
-                  onChange={e => setPlaceName(e.target.value)}
-                  style={{ width: '100%', marginTop: 4 }}
-                  autoFocus
-                />
-              </label>
-              <div style={{ marginBottom: 8 }}>
-                Latitude: {popup.lat.toFixed(5)}<br />
-                Longitude: {popup.lng.toFixed(5)}
-              </div>
+          <div style={{ position: 'absolute', left: 0, top: 0, width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,0.2)', zIndex: 1000 }}>
+            <form onSubmit={handlePopupSubmit} style={{ background: '#fff', padding: 24, borderRadius: 8, display: 'flex', flexDirection: 'column', minWidth: 300 }}>
+              <label>Place Name: <input type="text" value={placeName} onChange={e => setPlaceName(e.target.value)} style={{ width: '100%' }} autoFocus /></label>
+              <div style={{ margin: '8px 0' }}>Lat: {popup.lat.toFixed(5)} | Lng: {popup.lng.toFixed(5)}</div>
               <div style={{ display: 'flex', gap: 8 }}>
                 <button type="submit">Add Place</button>
                 <button type="button" onClick={() => setPopup(null)}>Cancel</button>
@@ -268,38 +316,37 @@ const CombinedMap = ({ publicSpaces = [] }) => {
           </div>
         )}
       </div>
-      <div style={{ marginLeft: 24, display: 'flex', flexDirection: 'column', alignItems: 'flex-start', height: 750 }}>
+
+      {/* SIDEBAR */}
+      <div style={{ marginLeft: 24, display: 'flex', flexDirection: 'column', width: 350, height: 750, background: '#fafafa', borderRadius: 8, padding: 16, overflowY: 'auto' }}>
         <div style={{ display: 'flex', alignItems: 'center', marginBottom: 16 }}>
-          <button
-            onClick={() => setShowHeat(h => !h)}
-            style={{
-              background: 'none',
-              border: 'none',
-              padding: 0,
-              cursor: 'pointer',
-              outline: 'none',
-              marginRight: 8,
-            }}
-            aria-label={showHeat ? 'Hide heatmap' : 'Show heatmap'}
-          >
-            <img
-              src={showHeat ? heatOnPng : heatOffPng}
-              alt={showHeat ? 'Heatmap on' : 'Heatmap off'}
-              style={{ width: 40, height: 40 }}
-            />
+          <button onClick={() => setShowHeat(!showHeat)} style={{ background: 'none', border: 'none', cursor: 'pointer', marginRight: 8 }}>
+            <img src={showHeat ? heatOnPng : heatOffPng} alt="toggle" style={{ width: 40, height: 40 }} />
           </button>
-          <span style={{ fontSize: 18, userSelect: 'none' }}>Show Heatmap</span>
+          <span>Show Heatmap</span>
         </div>
-        <div style={{ display: 'flex', alignItems: 'center', marginBottom: 16 }}>
-          <label style={{ fontSize: 16, marginRight: 8 }}>
-            <input
-              type="checkbox"
-              checked={showUserMarkers}
-              onChange={e => setShowUserMarkers(e.target.checked)}
-              style={{ marginRight: 4 }}
-            />
-            Show My Saved Places
-          </label>
+        
+        <label style={{ marginBottom: 16 }}>
+          <input type="checkbox" checked={showUserMarkers} onChange={e => setShowUserMarkers(e.target.checked)} /> Show My Saved Places
+        </label>
+
+        <hr style={{ width: '100%', border: '0.5px solid #eee' }} />
+
+        {/* NEW: Amenities List Section */}
+        <div style={{ marginTop: 8 }}>
+          <div style={{ fontWeight: 600, fontSize: 17, marginBottom: 8 }}>Amenities Nearby</div>
+          {amenityPopup && amenityPopup.amenities === null && <div style={{ color: '#888' }}>Loading...</div>}
+          {amenityPopup && amenityPopup.amenities && amenityPopup.amenities.length === 0 && <div style={{ color: '#888' }}>No amenities found.</div>}
+          {amenityPopup && amenityPopup.amenities && (
+            <ul style={{ paddingLeft: 18 }}>
+              {amenityPopup.amenities.slice(0, 10).map((a, idx) => (
+                <li key={idx} style={{ marginBottom: 10 }}>
+                  <strong>{a.tags.name || '(Unnamed)'}</strong> <span style={{ color: '#888', fontSize: 12 }}>({a.tags.amenity || a.tags.shop})</span>
+                  <div style={{ fontSize: 11, color: '#999' }}>Lat: {(a.lat || a.center.lat).toFixed(4)} Lng: {(a.lon || a.center.lon).toFixed(4)}</div>
+                </li>
+              ))}
+            </ul>
+          )}
         </div>
       </div>
     </div>

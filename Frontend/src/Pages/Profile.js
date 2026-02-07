@@ -2,12 +2,10 @@ import { useState } from 'react';
 import { authRequest } from '../utils/AuthRequest';
 import Security from '../Components/Security.js';
 import Info from '../Components/Info.js';
-import SavedLocationMap from '../Components/SavedLocationMap.js';
 
 const navItems = [
   { key: 'personal', label: 'Personal Info' },
   { key: 'security', label: 'Security' },
-  { key: 'map', label: 'Map' }
 ];
 
 export default function Profile({ onLogout }) {
@@ -27,7 +25,6 @@ export default function Profile({ onLogout }) {
     switch (selected) {
       case 'personal': return <Info onLogout={onLogout}/>;
       case 'security': return <Security onLogout={onLogout} />;
-      case 'map': return <SavedLocationMap />;
       default: return null;
     }
   };
