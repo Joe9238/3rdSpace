@@ -1,0 +1,59 @@
+volumes:
+  mysql_data:
+services:
+  frontend:
+    image: node:18-alpine
+    working_dir: /app
+    ports:
+      - "81:3000"
+    environment:
+      - CHOKIDAR_USEPOLLING=true
+      - CHOKIDAR_INTERVAL=100
+      - WATCHPACK_POLLING=true
+      - BROWSER=none
+      - HOST=0.0.0.0
+      - PORT=3000
+      - WDS_SOCKET_HOST=localhost
+      - WDS_SOCKET_PORT=81
+      - WDS_SOCKET_PATH=/ws
+    volumes:
+      - ./frontend:/app
+    command: sh -c "npm start"
+    depends_on:
+      - backend
+  backend:
+    image: node:20
+    volumes:
+      - ./backend:/usr/src/app
+    working_dir: /usr/src/app
+    ports:
+      - "82:9000"
+    depends_on:
+      - mysql
+    command: sh -c "chmod +x run.sh && ./run.sh"
+
+  mysql:
+    image: mysql:8.0
+    restart: always
+    environment:
+      MYSQL_ROOT_PASSWORD: rootpassword
+      MYSQL_DATABASE: uop_db
+      MYSQL_USER: uop_user
+      MYSQL_PASSWORD: uop_pass
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+
+  phpmyadmin:
+    image: phpmyadmin/phpmyadmin:latest
+    restart: always
+    ports:
+      - "8080:80"
+    environment:
+      - PMA_HOST=mysql
+      - PMA_PORT=3306
+      - PMA_USER=uop_user
+      - PMA_PASSWORD=uop_pass
+    depends_on:
+      - mysql

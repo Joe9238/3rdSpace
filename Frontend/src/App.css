@@ -1,0 +1,32 @@
+.App {
+  text-align: center;
+  min-height: 100vh;
+}
+
+.App-logo {
+  height: 35px;
+  vertical-align: middle;
+  border: 2px solid black;
+  border-radius: 5px;
+}
+
+.App-nav {
+  background-color: #282c34;
+  height: 5vh;
+  display: flex;
+  flex-direction: row;
+  justify-content: space-between;
+  font-size: calc(10px + 2vmin);
+  color: white;
+  padding: 0 10px;
+}
+
+.App-link {
+  color: #61dafb;
+}
+
+.nav-button {
+  color: white;
+  text-decoration: none;
+  margin-left: 15px;
+}
