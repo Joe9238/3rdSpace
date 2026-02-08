@@ -39,3 +39,26 @@
   padding: 10px;
   margin-bottom: 10px;
 }
+.spinner {
+  font-family: monospace;
+  font-weight: bold;
+  font-size: 1.2rem;
+  color: #555;
+  width: 20px;
+  height: 20px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.spinner::after {
+  content: "¦";
+  animation: spin-ascii 0.8s infinite steps(4);
+}
+
+@keyframes spin-ascii {
+  0% { content: "¦"; }
+  25% { content: "/"; }
+  50% { content: "-"; }
+  75% { content: "\\"; } /* Double backslash to escape in CSS */
+}

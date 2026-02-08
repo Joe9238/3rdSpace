@@ -10,6 +10,8 @@ import Panel from "../Components/panel.jsx";
 import 'leaflet.heat';
 import Safehaven from '../Components/Safehaven'; 
 import "./CombinedMap.css";
+import safeOnPng from '../images/safeHaven-On.png';
+import safeOffPng from '../images/safeHaven-off.png';
 
 // Helper to create colored marker icons
 function createColoredIcon(color) {
@@ -83,16 +85,27 @@ const CombinedMap = ({ publicSpaces = [] }) => {
   // Handle deletion of a saved location
   const handleDelete = async (id) => {
     if (!id) return;
+
+    // 1. Optimistic Update: Remove it from the UI immediately
+    // This ensures the marker "physically" disappears even if the DB takes a second
+    setLocations(prev => prev.filter(l => l.id !== id));
+
     try {
       const response = await fetch(`/api/location/delete/${id}`, {
         method: 'DELETE',
-        credentials: 'include'
+        // Ensure credentials are included to avoid the 401
+        credentials: 'include', 
+        headers: {
+          'Content-Type': 'application/json'
+        }
       });
-      if (response.ok) {
-        setLocations(prev => prev.filter(l => l.id !== id));
-      }
+
+      if (!response.ok) {
+
+      console.error("Delete failed on server:", response.status);
+    }
     } catch (err) {
-      console.error("Delete failed", err);
+      console.error("Network error during delete:", err);
     }
   };
 
@@ -426,18 +439,21 @@ useEffect(() => {
   
     marker.bindPopup(createPopUpContent(loc));
 
-  marker.on('popupopen', () => {
-    const btn = document.getElementById(`pop-del-${loc.id}`);
-    if (btn) {
-      // Attach the click handler to the raw DOM element
-      btn.onclick = () => {
-        handleDelete(loc.id);
-        leafletMap.current.closePopup(); // Close the popup after clicking
-      };
-    }
-  });
+    marker.on('popupopen', () => {
+        
+        setTimeout(() => {
+          const btn = document.getElementById(`pop-del-${loc.id}`);
+          if (btn) {
+            btn.onclick = (e) => {
+              e.preventDefault();
+              handleDelete(loc.id);
+              leafletMap.current.closePopup();
+            };
+          }
+        }, 10); 
+      });
 
-  return marker;
+      return marker;
 }).filter(Boolean);
 
     leafletMap.current._markers = [...publicMarkers, ...placeMarkers];
@@ -552,7 +568,7 @@ return (
             onClick={() => setShowSafehaven(!showSafehaven)}
             style={{ background: 'none', border: 'none', cursor: 'pointer', marginRight: 8 }}
           >
-            <img src={showUserMarkers ? favOnPng : favOffPng} style={{ width: 40, height: 40 }} />
+            <img src={showSafehaven ? safeOnPng : safeOffPng} style={{ width: 40, height: 40 }} />
           </button>
           <span>Show Nearby Safehaven</span>
           

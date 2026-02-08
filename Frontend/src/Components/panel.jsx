@@ -80,7 +80,7 @@ const ThirdspaceCard = ({ amenity }) => {
           <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
             <span>Safety Rating:</span>
             <span style={{ fontWeight: 'bold', color: crimeLevel > 0.5 ? '#dc3545' : '#28a745' }}>
-              {crimeLevel > 0.5 ? crimeLevel.toFixed(2) : crimeLevel.toFixed(2)}
+              {crimeLevel > 0.5 ? "CAUTION" : "SAFE"}
             </span>
           </div>
           {/* Simple progress bar representing (1 - crimeLevel) */}
@@ -136,8 +136,8 @@ function Panel({ isOpen, closePanel, amenities }) {
       <div className="list" style={{ padding: '15px', overflowY: 'auto', height: 'calc(100% - 80px)' }}>
         {amenities === null ? (
           <div style={{ textAlign: 'center', padding: '40px' }}>
-            <div className="spinner" style={{ marginBottom: '10px' }}>⌛</div>
-            <p style={{ color: '#888', fontStyle: 'italic' }}>Analyzing safety and proximity...</p>
+            <div className="spinner" style={{ marginBottom: '10px' }}></div>
+            <p style={{ color: '#a19f9f', fontStyle: 'italic' }}>Analyzing best places...</p>
           </div>
         ) : Array.isArray(amenities) && amenities.length === 0 ? (
           <p className="no-data" style={{ textAlign: 'center', padding: '20px', color: '#666' }}>No places found in this area.</p>
