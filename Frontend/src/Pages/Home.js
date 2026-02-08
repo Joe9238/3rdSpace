@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 
 function Home() {
   return (
-    <div style={{ padding: '2rem', maxWidth: 800, margin: '0 auto' }}>
+    <div style={{ paddingLeft: '20px'}}>
       <h1>Welcome to 3rdSpace</h1>
       <p style={{ fontSize: '18px', marginBottom: '2rem' }}>
         Explore public spaces, view crime heatmaps, and manage your profile securely.
