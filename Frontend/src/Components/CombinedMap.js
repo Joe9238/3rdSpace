@@ -6,8 +6,9 @@ import heatOnPng from '../images/heat-on.png';
 import heatOffPng from '../images/heat-off.png';
 import favOnPng from '../images/favourite-on.png';
 import favOffPng from '../images/favourite-off.png';
-import Panel from "../Components/panel";
+import Panel from "../Components/panel.jsx";
 import 'leaflet.heat';
+import "./CombinedMap.css";
 
 // Helper to create colored marker icons
 function createColoredIcon(color) {
@@ -131,10 +132,6 @@ const query = `
       way["leisure"="nature_reserve"](around:${radius},${lat},${lng});
       relation["leisure"="nature_reserve"](around:${radius},${lat},${lng});
 
-      node["natural"](around:${radius},${lat},${lng});
-      way["natural"](around:${radius},${lat},${lng});
-      relation["natural"](around:${radius},${lat},${lng});
-
       node["boundary"="protected_area"]["protect_class"="2"](around:${radius},${lat},${lng});
       way["boundary"="protected_area"]["protect_class"="2"](around:${radius},${lat},${lng});
       relation["boundary"="protected_area"]["protect_class"="2"](around:${radius},${lat},${lng});
@@ -210,6 +207,8 @@ const query = `
     return value;
   }
 
+ 
+
   // Fetch heatmap data for the current map bounds
   const fetchHeatData = async (bounds) => {
     if (!bounds) return;
@@ -235,65 +234,141 @@ const query = `
     }
   };
 
-  // Initialize the map
-  useEffect(() => {
-    if (!mapRef.current || leafletMap.current) return;
-    const ukBounds = L.latLngBounds(L.latLng(49.4, -12), L.latLng(59.0, 2.5));
-    //set to UK center and zoomed out
-    leafletMap.current = L.map(mapRef.current, {
-      center: [51.5, -1.0],
-      zoom: 6,
-      maxBounds: ukBounds,
-      maxBoundsViscosity: 1,
-    });
-    // Add OpenStreetMap tiles
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-      attribution: '&copy; OpenStreetMap',
-      maxZoom: 19,
-      minZoom: 6,
-    }).addTo(leafletMap.current);
+// 1. INITIALIZE MAP (Runs only once)
+useEffect(() => {
+  if (!mapRef.current || leafletMap.current) return;
+  
+  const ukBounds = L.latLngBounds(L.latLng(49.4, -12), L.latLng(59.0, 2.5));
+  leafletMap.current = L.map(mapRef.current, {
+    center: [51.5, -1.0],
+    zoom: 6,
+    maxBounds: ukBounds,
+    maxBoundsViscosity: 1,
+  });
 
-    fetchHeatData(leafletMap.current.getBounds()); // Initial heat data load
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    attribution: '&copy; OpenStreetMap',
+    maxZoom: 19,
+    minZoom: 6,
+  }).addTo(leafletMap.current);
 
-    // Update heat data and zoom level on map interactions
-    leafletMap.current.on('moveend', () => {
-      fetchHeatData(leafletMap.current.getBounds());
-      setZoomLevel(leafletMap.current.getZoom());
-    });
-    leafletMap.current.on('zoomend', () => setZoomLevel(leafletMap.current.getZoom())); // Keep track of zoom level
+  fetchHeatData(leafletMap.current.getBounds());
 
-    // Click handler does Fetch Amenities and sets a temp marker
-  leafletMap.current.on('click', async e => {
+  leafletMap.current.on('moveend', () => {
+    fetchHeatData(leafletMap.current.getBounds());
+    setZoomLevel(leafletMap.current.getZoom());
+  });
+
+  leafletMap.current.on('zoomend', () => setZoomLevel(leafletMap.current.getZoom()));
+}, []); // Empty dependency array means this only runs ONCE
+const calculateLocationScore = (lat, lng, targetLat, targetLng, heatData) => {
+  let totalDangerImpact = 0;
+  const points = Array.isArray(heatData) ? heatData : [];
+  
+  // Settings
+  const sigma = 0.0012;  // Slightly wider influence
+  const maxSearchDist = 0.00025; // 25 meters
+  const sensitivity = 0.9; // Adjusted so the score is less "binary"
+
+  points.forEach((point) => {
+    // Explicitly use indices since the test showed [lat, lng, intensity]
+    const hLat = point[0];
+    const hLng = point[1];
+    const hVal = point[2] || 1;
+
+    // Use a basic squared distance check first (faster)
+    const d2 = Math.pow(lat - hLat, 2) + Math.pow(lng - hLng, 2);
+    const d = Math.sqrt(d2);
+    
+    if (d < maxSearchDist) {
+      // Gaussian decay: closer crimes hurt the score more
+      const impact = hVal * Math.exp(-d2 / (2 * Math.pow(sigma, 2)));
+      totalDangerImpact += impact;
+    }
+  });
+
+  const crimeIntensity = Math.min(totalDangerImpact / sensitivity, 1);
+  const safetyGrade = Math.round((1 - crimeIntensity) * 100);
+
+  // Distance from click to amenity
+  const rawDist = Math.sqrt(Math.pow(lat - targetLat, 2) + Math.pow(lng - targetLng, 2));
+  const normalizedDist = Math.min(rawDist / 0.01, 1);
+  
+  const score = (0.8 * (1 - crimeIntensity)) + (0.2 * (1 - normalizedDist));
+
+  return {
+    totalScore: score.toFixed(2),
+    safetyGrade: safetyGrade,
+    crimeLevel: crimeIntensity
+  };
+};
+// 2. CLICK HANDLER (Updates whenever 'locations' changes)
+useEffect(() => {
+  if (!leafletMap.current) return;
+
+  // Remove the old listener before adding a new one to prevent duplicates
+  leafletMap.current.off('click');
+
+  leafletMap.current.on('click', async (e) => {
     const { lat, lng } = e.latlng;
 
-    // --- 1. SELECTION PIN LOGIC ---
-    if (tempMarkerRef.current) {
-        tempMarkerRef.current.remove();
-    }
-
+    // --- SELECTION PIN ---
+    if (tempMarkerRef.current) tempMarkerRef.current.remove();
     const tempIcon = createColoredIcon('blue');
-    const newTempMarker = L.marker([lat, lng], { 
-        icon: tempIcon,
-        alt: "Selection Marker"
-    }).addTo(leafletMap.current);
-    
+    const newTempMarker = L.marker([lat, lng], { icon: tempIcon }).addTo(leafletMap.current);
     tempMarkerRef.current = newTempMarker;
 
-    // --- 2. FORM POPUP LOGIC (Waits for Marker Click) ---
     newTempMarker.on('click', (markerEvent) => {
-        L.DomEvent.stopPropagation(markerEvent); 
-        setPopup({ lat, lng }); // Opens the naming overlay
-        setPlaceName('');
+      L.DomEvent.stopPropagation(markerEvent);
+      setPopup({ lat, lng });
+      setPlaceName('');
     });
 
-    // --- 3. AMENITIES LOGIC (Runs instantly on Map Click) ---
-    setIsOpen(true); // Open the sidebar panel immediately
-    setAmenityPopup({ lat, lng, amenities: null }); // Show loading state
+    // --- AMENITIES + SAVED PLACES LOGIC ---
+    setIsOpen(true);
+    setAmenityPopup({ lat, lng, amenities: null });
+
+    const apiAmenities = await fetchAmenities(lat, lng);
+
+    // Merge logic using the LATEST 'locations' state
+    const localSaved = locations.map(loc => {
+      const lLat = loc.latitude ?? loc.lat;
+      const lLng = loc.longitude ?? loc.lng;
+      const dist = Math.sqrt(Math.pow(lLat - lat, 2) + Math.pow(lLng - lng, 2));
+
+      return {
+        id: loc.id,
+        isSavedPin: true, // Matches your ThirdspaceCard logic
+        lat: lLat,
+        lon: lLng,
+        name: loc.name || 'Saved Place',
+        tags: { name: loc.name || 'Saved Place', amenity: 'favourite' },
+        distance: dist
+      };
+    });
+
+   const formattedApi = apiAmenities.map(amt => {
+    const aLat = amt.lat || amt.center?.lat;
+    const aLon = amt.lon || amt.center?.lon;
     
-    const amenities = await fetchAmenities(lat, lng);
-    setAmenityPopup({ lat, lng, amenities });
-});
-  }, []);
+   const assessment = calculateLocationScore(aLat, aLon, lat, lng, heatData);
+
+    return {
+        ...amt,
+        isSavedPin: false,
+        distance: Math.sqrt(Math.pow(aLat - lat, 2) + Math.pow(aLon - lng, 2)),
+        score: assessment.totalScore,    // For sorting
+        safetyGrade: assessment.safetyGrade, // For the UI Bar
+        crimeLevel: assessment.crimeLevel    // For the UI Color
+      };
+    });
+
+    // Sort so the safest, closest places appear at the top of the panel
+    const combinedList = [...localSaved, ...formattedApi].sort((a, b) => b.score - a.score);
+  setAmenityPopup({ lat, lng, amenities: combinedList });
+  });
+  window.debugMap = { heatData, locations };
+}, [locations, heatData]); // RE-BINDS THE CLICK EVENT WHENEVER LOCATIONS CHANGE
 
   //temp marker management
   useEffect(() => {
@@ -333,7 +408,7 @@ const query = `
     }).filter(Boolean);
 
 
-  const placeMarkers = locations.map(loc => {
+  const placeMarkers = (showUserMarkers > 0 ? locations : []).map(loc => {
     
     const lat = loc.latitude ?? loc.lat;
     const lng = loc.longitude ?? loc.lng;
@@ -419,11 +494,27 @@ const query = `
 };
   
 
-  return (
-    <div style={{ display: 'flex', flexDirection: 'row', alignItems: 'flex-start' }}>
-      <div style={{ position: 'relative', width: 750, height: 750 }}>
-        <div ref={mapRef} style={{ height: 750, width: 750 }} />
-        {/* Save Location Overlay Form */}
+return (
+  <div className="map-page-wrapper" style={{ display: 'flex', height: '750px', position: 'relative', overflow: 'hidden' }}>
+    
+    {/* 1. SIDEBAR PANEL CONTAINER */}
+    <div className={`side-panel ${isOpen ? 'open' : ''}`}>
+      {amenityPopup && (
+        <Panel
+          // Removing the key here prevents the component from unmounting/remounting
+          // which allows the CSS transition to work smoothly
+          isOpen={isOpen}
+          closePanel={() => setIsOpen(false)}
+          amenities={amenityPopup.amenities}
+        />
+      )}
+    </div>
+
+    {/* 2. MAP CONTAINER */}
+    <div style={{ position: 'relative', flexGrow: 1 }}>
+      <div ref={mapRef} style={{ height: '750px', width: '100%' }} />
+      
+      {/* Save Location Overlay Form */}
         {popup && (
           <div style={{ position: 'absolute', left: 0, top: 0, width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,0.2)', zIndex: 1000 }}>
             <form onSubmit={handlePopupSubmit} style={{ background: '#fff', padding: 24, borderRadius: 8, display: 'flex', flexDirection: 'column', minWidth: 300 }}>
@@ -438,36 +529,25 @@ const query = `
         )}
       </div>
 
-      {/* SIDEBAR */}
-      <div style={{ marginLeft: 24, display: 'flex', flexDirection: 'column', width: 350, height: 750, background: '#fafafa', borderRadius: 8, padding: 16, overflowY: 'auto' }}>
-        <h1>Filters</h1>
-        <div style={{ display: 'flex', alignItems: 'center', marginBottom: 16 }}>
-          <button onClick={() => setShowHeat(!showHeat)} style={{ background: 'none', border: 'none', cursor: 'pointer', marginRight: 8 }}>
-            <img src={showHeat ? heatOnPng : heatOffPng} alt="toggle" style={{ width: 40, height: 40 }} />
-          </button>
-          <span>Show Heatmap</span>
-          
-        </div>
-        <div style={{ display: 'flex', alignItems: 'center', marginBottom: 16 }}>
-          <button onClick={() => setShowUserMarkers(!showUserMarkers)} style={{ background: 'none', border: 'none', cursor: 'pointer', marginRight: 8 }}>
-            <img src={showUserMarkers ? favOnPng : favOffPng} alt="toggle" style={{ width: 40, height: 40 }} />
-          </button>
-          <span>Show Saved Places</span>
-        </div>
- </div>
+    {/* 3. FILTERS (Right Side) */}
+    <div className="filter-sidebar">
+      <h1>Filters</h1>
+      <div style={{ display: 'flex', alignItems: 'center', marginBottom: 16 }}>
+        <button onClick={() => setShowHeat(!showHeat)} style={{ background: 'none', border: 'none', cursor: 'pointer', marginRight: 8 }}>
+          <img src={showHeat ? heatOnPng : heatOffPng} alt="toggle" style={{ width: 40, height: 40 }} />
+        </button>
+        <span>Show Heatmap</span>
+      </div>
 
-        {amenityPopup && (
-					<Panel
-					    key={`${amenityPopup?.lat}-${amenityPopup?.lng}`}
-						isOpen={isOpen}
-						closePanel={() => setIsOpen(false)}
-						amenities={amenityPopup.amenities}
-					/>
-                    )}
-                  
-     
+      <div style={{ display: 'flex', alignItems: 'center', marginBottom: 16 }}>
+        <button onClick={() => setShowUserMarkers(!showUserMarkers)} style={{ background: 'none', border: 'none', cursor: 'pointer', marginRight: 8 }}>
+          <img src={showUserMarkers ? favOnPng : favOffPng} alt="toggle" style={{ width: 40, height: 40 }} />
+        </button>
+        <span>Show Saved Places</span>
+      </div>
     </div>
-  );
+  </div>
+);
 };
 
 export default CombinedMap;

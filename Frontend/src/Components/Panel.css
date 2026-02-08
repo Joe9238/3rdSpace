@@ -1,37 +1,41 @@
-.Panel-container {
-  position: fixed;
+/* The wrapper that handles the sliding animation */
+.side-panel {
+  position: absolute;
+  left: -400px; /* Fully hidden to the left */
   top: 0;
-  right: 0;
-  height: 100vh;
-  width: 360px;
-  background: #fff;
-  box-shadow: -2px 0 10px rgba(0, 0, 0, 0.15);
-  transition: transform 0.3s ease;
-  z-index: 1000;
-  padding: 16px;
-  overflow-y: auto;
-  transform: translateX(100%);
+  width: 350px;
+  height: 100%;
+  z-index: 2000; /* Ensure it sits above the Leaflet map */
+  background: white;
+  transition: left 0.3s ease-in-out; /* The sliding effect */
+  box-shadow: 2px 0 12px rgba(0,0,0,0.15);
 }
 
-.Panel-container.open {
-  transform: translateX(0);
+.side-panel.open {
+  left: 0; /* Slide into view */
 }
 
-.Card-details{
-display: flex;
-  flex-direction: column;   /* stack items vertically */
-  align-items: flex-start;  /* align to the left */
-  text-align: left;  
-
-  margin-bottom: 16px;  
+/* The inner content of your panel */
+.Panel-container {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  padding: 20px;
+  overflow-y: auto; /* Allows scrolling if many amenities are found */
 }
 
-.Panel-container strong{
-  size: 20;
-}
 .exit {
-  display: block;
-  height: 30px;
-  width: 30px;
-  text-align: center; 
+  align-self: flex-end;
+  background: #f0f0f0;
+  border: none;
+  padding: 8px 12px;
+  cursor: pointer;
+  border-radius: 4px;
+}
+
+.singleCard{
+  border: 1px solid #353535;
+  border-radius: 5px;
+  padding: 10px;
+  margin-bottom: 10px;
 }
