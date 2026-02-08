@@ -154,9 +154,22 @@ const query = `
         headers: { 'Content-Type': 'text/plain' }
       });
       const data = await res.json();
+      const elements = data.elements;
 
-      return data.elements;
+      // Calculate distance and sort
+      const sortedElements = elements.sort((a, b) => {
+          const aLat = a.lat || a.center?.lat;
+          const aLon = a.lon || a.center?.lon;
+          const bLat = b.lat || b.center?.lat;
+          const bLon = b.lon || b.center?.lon;
 
+          const distA = Math.sqrt(Math.pow(aLat - lat, 2) + Math.pow(aLon - lng, 2));
+          const distB = Math.sqrt(Math.pow(bLat - lat, 2) + Math.pow(bLon - lng, 2));
+          
+          return distA - distB;
+      });
+
+      return sortedElements;
     } catch (e) {
       console.error("Overpass error", e);
       return [];
@@ -252,15 +265,14 @@ const query = `
     leafletMap.current.on('zoomend', () => setZoomLevel(leafletMap.current.getZoom())); // Keep track of zoom level
 
     // Click handler does Fetch Amenities and sets a temp marker
-leafletMap.current.on('click', async e => {
+  leafletMap.current.on('click', async e => {
     const { lat, lng } = e.latlng;
 
-    // Remove the previous marker if it exists
+    // --- 1. SELECTION PIN LOGIC ---
     if (tempMarkerRef.current) {
         tempMarkerRef.current.remove();
     }
 
-    // Create the new blue marker
     const tempIcon = createColoredIcon('blue');
     const newTempMarker = L.marker([lat, lng], { 
         icon: tempIcon,
@@ -269,36 +281,20 @@ leafletMap.current.on('click', async e => {
     
     tempMarkerRef.current = newTempMarker;
 
-    // The marker now waits to be clicked
+    // --- 2. FORM POPUP LOGIC (Waits for Marker Click) ---
     newTempMarker.on('click', (markerEvent) => {
-        // Prevent the map click from firing again
         L.DomEvent.stopPropagation(markerEvent); 
-        
-        // Open your naming form
-        setPopup({ lat, lng }); 
+        setPopup({ lat, lng }); // Opens the naming overlay
         setPlaceName('');
     });
 
-    //Update sidebar amenities 
-    setAmenityPopup({ lat, lng, amenities: null });
+    // --- 3. AMENITIES LOGIC (Runs instantly on Map Click) ---
+    setIsOpen(true); // Open the sidebar panel immediately
+    setAmenityPopup({ lat, lng, amenities: null }); // Show loading state
+    
     const amenities = await fetchAmenities(lat, lng);
     setAmenityPopup({ lat, lng, amenities });
 });
-    leafletMap.current.on('click', async e => {
-      const { lat, lng } = e.latlng;
-      setPopup({ lat, lng });
-      setPlaceName('');
-      setIsOpen(true); 
-      setAmenityPopup({ lat, lng, amenities: null }); 
-      const amenities = await fetchAmenities(lat, lng);
-      setAmenityPopup({ lat, lng, amenities });
-    });
-
-    return () => {
-      leafletMap.current.off('moveend');
-      leafletMap.current.off('zoomend');
-      leafletMap.current.off('click');
-    };
   }, []);
 
   //temp marker management
@@ -393,27 +389,36 @@ leafletMap.current.on('click', async e => {
   const handlePopupSubmit = async (e) => {
     e.preventDefault();
     if (!popup || !placeName.trim()) return;
-    const newLoc = { lat: popup.lat, lng: popup.lng, name: placeName.trim() };
+
+    // 1. ADD A TEMPORARY ID (Date.now() works great for this)
+    const newLoc = { 
+        id: Date.now(), // This allows handleDelete to work immediately
+        lat: popup.lat, 
+        lng: popup.lng, 
+        name: placeName.trim() 
+    };
   
-    setLocations(prev => [...prev, newLoc]); // Optimistically add to UI
-    setPopup(null); // Close the popup immediately
-    // Save to backend, no need to wait for this to update UI
+    setLocations(prev => [...prev, newLoc]);
+    setPopup(null); 
+
     try {
-      await fetch('/api/location/save', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(newLoc)
-      });
-    } catch (err) { console.error(err); }
-    setPopup(null); // Close the popup immediately
+        await fetch('/api/location/save', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(newLoc)
+        });
+        // Note: In a production app, you'd replace the temp ID 
+        // with the real ID from the server response here.
+    } catch (err) { 
+        console.error(err); 
+    }
         
-        // Remove the blue marker now that it's a permanent "Saved" marker
-        if (tempMarkerRef.current) {
-            tempMarkerRef.current.remove();
-            tempMarkerRef.current = null;
-        }
-    
-  };
+    // 2. Remove the blue marker
+    if (tempMarkerRef.current) {
+        tempMarkerRef.current.remove();
+        tempMarkerRef.current = null;
+    }
+};
   
 
   return (
@@ -437,6 +442,7 @@ leafletMap.current.on('click', async e => {
 
       {/* SIDEBAR */}
       <div style={{ marginLeft: 24, display: 'flex', flexDirection: 'column', width: 350, height: 750, background: '#fafafa', borderRadius: 8, padding: 16, overflowY: 'auto' }}>
+        <h1>Filters</h1>
         <div style={{ display: 'flex', alignItems: 'center', marginBottom: 16 }}>
           <button onClick={() => setShowHeat(!showHeat)} style={{ background: 'none', border: 'none', cursor: 'pointer', marginRight: 8 }}>
             <img src={showHeat ? heatOnPng : heatOffPng} alt="toggle" style={{ width: 40, height: 40 }} />

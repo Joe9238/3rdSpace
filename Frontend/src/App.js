@@ -54,16 +54,15 @@ function App() {
     <div className="App">
       <nav className="App-nav">
         <Link to="/"><img src={logo} id="logo" className="App-logo" alt="logo" /></Link>
-        <Link to="/map" className="nav-button" style={{ paddingLeft: "20px", paddingRight: "20px" }}>Map</Link>
+        <Link to="/map" className="nav-button" style={{ paddingLeft: "60px"}}>Map</Link>
         {isAuthenticated ? (
          <div>
-          <Link to="/profile" className="nav-button">Profile</Link>
-           <Link to="/Map" className="nav-button">Map</Link>
+          <Link to="/profile" className="nav-button" style={{ paddingRight: "20px"}}>Profile</Link>
           </div>
        
         ) : (
-          <div>
-            <Link to="/register" className="nav-button" style={{ paddingRight: "20px" }}>Register</Link>
+          <div style={{ paddingRight: "30px" }} >
+            <Link to="/register" className="nav-button" >Register</Link>
             <Link to="/login" className="nav-button">Login</Link>
           </div>
         )}
@@ -78,13 +77,6 @@ function App() {
           element={
             <RequireAuth onAuthChange={setIsAuthenticated}>
               <Profile onLogout={handleLogout} />
-            </RequireAuth>
-          }
-        />
-        <Route
-          path="/map"
-          element={
-            <RequireAuth onAuthChange={setIsAuthenticated}>
             </RequireAuth>
           }
         />
