@@ -25,8 +25,21 @@ function Panel({isOpen, closePanel, amenities}){
 
         }
 
+        function getDisplayName() {
+            const tags = amenity?.tags || {};
 
-        const name = amenity.tags.name && amenity.tags ? amenity.tags.name  : "no name";
+            if (tags.name) return tags.name;
+
+            if (tags.leisure === "pitch") {
+                const sport = tags.sport ? tags.sport.replace("_", " ") : null;
+                return sport ? `Pitch – ${sport}` : "Pitch";
+            }
+
+            return null;
+            }
+
+        const name = getDisplayName();
+        if (!name) return null;
         const tags = amenity.tags || {};
 
             const type =

@@ -8,6 +8,7 @@ import favOnPng from '../images/favourite-on.png';
 import favOffPng from '../images/favourite-off.png';
 import Panel from "../Components/panel";
 import 'leaflet.heat';
+import Safehaven from '../Components/Safehaven'; 
 
 // Helper to create colored marker icons
 function createColoredIcon(color) {
@@ -62,6 +63,7 @@ const CombinedMap = ({ publicSpaces = [] }) => {
   const [placeName, setPlaceName] = useState('');
   const [tempMarkerPos, setTempMarkerPos] = useState(null);
   const tempMarkerRef = useRef(null);
+  const [showSafehaven, setShowSafehaven] = useState(false);
 
   // State for Amenities
   const [isOpen, setIsOpen] = useState(false);
@@ -108,7 +110,7 @@ const CombinedMap = ({ publicSpaces = [] }) => {
 						"park", "garden", "recreation_ground", "playground", "common",
 						"dog_park", "pitch", "golf_course", "outdoor_seating",
 
-						"beach", "nature_reserve"
+						"beach", "nature_reserve", "pitch"
 
 				];
 				const tags = ["amenity", "leisure", "natural", "landuse"];
@@ -448,6 +450,18 @@ leafletMap.current.on('click', async e => {
           </button>
           <span>Show Saved Places</span>
         </div>
+
+        <div style={{ display: 'flex', alignItems: 'center', marginBottom: 16 }}>
+          <button
+            onClick={() => setShowSafehaven(!showSafehaven)}
+            style={{ background: 'none', border: 'none', cursor: 'pointer', marginRight: 8 }}
+          >
+            <img src={showUserMarkers ? favOnPng : favOffPng} style={{ width: 40, height: 40 }} />
+          </button>
+          <span>Show Nearby Safehaven</span>
+          
+        </div>
+           {showSafehaven && <Safehaven />}
  </div>
 
         {amenityPopup && (
