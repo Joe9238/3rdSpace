@@ -12,9 +12,22 @@ function Panel({isOpen, closePanel, amenities}){
 
       const ThirdspaceCard = ({ amenity}) => {
 
+        function getAccessibility(){
+           const tags = amenity?.tags || {};
+
+         return{
+            wheelchair: tags.wheelchair || "unknown",
+            ramp: tags.ramp || "unknown",
+            smoothness: tags.smoothness || "unknown",
+            surface: tags.surface || "unknown",
+         }
+
+
+        }
+
 
         const name = amenity.tags.name && amenity.tags ? amenity.tags.name  : "no name";
-       const tags = amenity.tags || {};
+        const tags = amenity.tags || {};
 
             const type =
             tags.amenity ||
@@ -27,16 +40,25 @@ function Panel({isOpen, closePanel, amenities}){
                 : null) ||
             tags.boundary ||
             "Amenity";
-         if (!lat || !lon) return null;
+         
         const lat = amenity.lat || (amenity.center && amenity.center.lat)
         const lon = amenity.lon || (amenity.center && amenity.center.lon)  
-    
+        if (!lat || !lon) return null;
+        const acc = getAccessibility();
 
       return(
         <div className="Card-details">
 
         <strong>{name}</strong>
         <p>{type}</p>
+        <p>Accessibility</p>
+        <ui>
+            <li>Wheelchair friendly: {acc.wheelchair}</li>
+            <li>Ramp: {acc.ramp}</li>
+            <li>Smoothness: {acc.smoothness}</li>
+            <li>Surface: {acc.surface}</li>
+        </ui>
+        
         {lat && lon &&(
         <a href={`https://www.google.com/maps/dir/?api=1&destination=${lat},${lon}`}>Location</a>
         )}
@@ -56,7 +78,9 @@ function Panel({isOpen, closePanel, amenities}){
               {Array.isArray(amenities)&&amenities.length === 0 && (
         <p className="no-data">no third spaces found</p>
       )}   
-        {amenities && amenities.map((amenity) =>(
+        {amenities && amenities
+        .filter(amenity => amenity.tags?.name)
+        .map((amenity) =>(
          <ThirdspaceCard key={amenity.idx} amenity={amenity}/>
         ))}
        </div>

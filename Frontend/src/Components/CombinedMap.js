@@ -114,37 +114,39 @@ const CombinedMap = ({ publicSpaces = [] }) => {
 
 				];
 				const tags = ["amenity", "leisure", "natural", "landuse"];
-				const query = `
-					[out:json];
-					(
-				${tags.map( tag =>
-				       amenityTypes.map(type => `
-							node["${tag}"="${type}"](around:${radius},${lat},${lng});
-							way["${tag}"="${type}"](around:${radius},${lat},${lng});
-							relation["${tag}"="${type}"](around:${radius},${lat},${lng});
-							`)
-							.join("")
-					)
-						.join("")}
-					node["leisure"="nature_reserve"](around:${radius},${lat},${lng});
-					way["leisure"="nature_reserve"](around:${radius},${lat},${lng});
-					relation["leisure"="nature_reserve"](around:${radius},${lat},${lng});
+const query = `
+[out:json];
+(
+  ${tags
+    .map(tag =>
+      amenityTypes
+        .map(type => `
+          node["${tag}"="${type}"](around:${radius},${lat},${lng});
+          way["${tag}"="${type}"](around:${radius},${lat},${lng});
+          relation["${tag}"="${type}"](around:${radius},${lat},${lng});
+        `)
+        .join("")
+    )
+    .join("")}
 
-					node["natural"](around:${radius},${lat},${lng});
-					way["natural"](around:${radius},${lat},${lng});
-					relation["natural"](around:${radius},${lat},${lng});
-					);
+      node["leisure"="nature_reserve"](around:${radius},${lat},${lng});
+      way["leisure"="nature_reserve"](around:${radius},${lat},${lng});
+      relation["leisure"="nature_reserve"](around:${radius},${lat},${lng});
 
-					node["boundary"="protected_area"]["protect_class"="2"](around:${radius},${lat},${lng});
-					way["boundary"="protected_area"]["protect_class"="2"](around:${radius},${lat},${lng});
-					relation["boundary"="protected_area"]["protect_class"="2"](around:${radius},${lat},${lng});
+      node["natural"](around:${radius},${lat},${lng});
+      way["natural"](around:${radius},${lat},${lng});
+      relation["natural"](around:${radius},${lat},${lng});
 
-					node["boundary"="national_park"](around:${radius},${lat},${lng});
-					way["boundary"="national_park"](around:${radius},${lat},${lng});
-					relation["boundary"="national_park"](around:${radius},${lat},${lng});
+      node["boundary"="protected_area"]["protect_class"="2"](around:${radius},${lat},${lng});
+      way["boundary"="protected_area"]["protect_class"="2"](around:${radius},${lat},${lng});
+      relation["boundary"="protected_area"]["protect_class"="2"](around:${radius},${lat},${lng});
 
-					out center;
-				`;
+      node["boundary"="national_park"](around:${radius},${lat},${lng});
+      way["boundary"="national_park"](around:${radius},${lat},${lng});
+      relation["boundary"="national_park"](around:${radius},${lat},${lng});
+    );
+    out center;
+    `;
     try {
       const res = await fetch('https://overpass-api.de/api/interpreter', {
         method: 'POST',
@@ -152,7 +154,9 @@ const CombinedMap = ({ publicSpaces = [] }) => {
         headers: { 'Content-Type': 'text/plain' }
       });
       const data = await res.json();
+
       return data.elements;
+
     } catch (e) {
       console.error("Overpass error", e);
       return [];
