@@ -60,8 +60,6 @@ const CombinedMap = ({ publicSpaces = [] }) => {
   const [showUserMarkers, setShowUserMarkers] = useState(true);
   const [popup, setPopup] = useState(null);
   const [placeName, setPlaceName] = useState('');
-  const [airData, setAirData] = useState([]); 
-  const [showAirQuality, setShowAirQuality] = useState(false);
   const [tempMarkerPos, setTempMarkerPos] = useState(null);
   const tempMarkerRef = useRef(null);
 
@@ -330,8 +328,6 @@ leafletMap.current.on('click', async e => {
     if (leafletMap.current._markers) {
       leafletMap.current._markers.forEach(m => m.remove());
     }
-    
-
     const publicMarkers = publicSpaces.map(space => {
 
       if (space.lat == null || space.lng == null) return null;
